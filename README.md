@@ -19,14 +19,8 @@ The model is an improvement of the model proposed by: Chiang & Goldreich (1997) 
 A port to Python was inspired by the fact that IDL is a legacy paywalled software and CG+ does not run on GDL. The core of the program (cgplus.pro) was rewritten with little change (including comments) and the results of both versions (IDL and Python) must be identical. This script includes a user-interface similar to the one provided by fitcgplus.pro but it was written independently. It has a few additional features such as enhanced figure control, help button and save SED button. Currently there is no plan to do anything more with it but I am open to suggestions.
 
 ## How to use:
-Unzip the archive, go into the directory that is created, execute python script.
-For the script you need numpy, scipy and matplotlib. It was written with Python 3.8
-but other versions may work too.
+For the script you need numpy, scipy and matplotlib. It was written with Python 3.8 but other versions may work too.
 
-For fitting your own data: make a 'mystarname.dat' file with the same
-format as abaur.dat: frequency in Hz, observed flux in erg/s/cm^2/Hz
-and the error bars (down and up) in erg/s/cm^2/Hz. If both error bars
-are taken 0.0 then the code connects all the points with a line. Otherwise
-they are plotted as points with the error bars given. If they are both
--1.0 they will be data points without an error bar. 
+For fitting your own data: make a 'mystarname.dat' file with the same format as abaur.dat: frequency in Hz, observed flux in erg/s/cm^2/Hz and the error bars (down and up) in erg/s/cm^2/Hz. If both error bars are taken 0.0 then the code connects all the points with a line. Otherwise they are plotted as points with the error bars given. If they are both -1.0 they will be data points without an error bar. 
 
+Opacity files are the same as in the original (source unknown). They can be replaced by your own but they must have the same names and style as original.
