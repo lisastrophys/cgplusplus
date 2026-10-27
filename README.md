@@ -32,6 +32,7 @@ Ready-made apps for Linux and Windows are attached to each release on the [Relea
 
 - **Linux:** download `cgplusplus-linux-x86_64.tar.gz`, unpack it with `tar xzf cgplusplus-linux-x86_64.tar.gz` and start it with `./cgplusplus`. It runs on Ubuntu 22.04, Debian 12, Fedora 36 or newer, and similar systems.
 - **Windows:** download `cgplusplus-windows-x86_64.exe` and double-click it. Windows may warn that the app is unrecognised because it is not signed: click *More info*, then *Run anyway*.
+- **macOS** (Apple Silicon, macOS 14 or newer): download `cgplusplus-macos-arm64.zip`, double-click it to unpack, and move `CG++.app` to your Applications folder if you like. The app is not signed by Apple, so macOS refuses to open it the first time. Open *System Settings → Privacy & Security*, scroll down and click *Open Anyway*; after that it opens normally. If macOS instead says the app "is damaged", run this once in Terminal and try again: `xattr -dr com.apple.quarantine /Applications/CG++.app` (adjust the path if the app is elsewhere).
 
 The first start takes a few seconds while the app unpacks itself. Model files, observations and saved SEDs open and save in the folder you start the app from.
 

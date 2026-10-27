@@ -1,4 +1,4 @@
-# Builds the CG++ desktop app for Linux and Windows.
+# Builds the CG++ desktop app for Linux, Windows and macOS (Apple Silicon).
 # Runs on every pushed tag like v1.0 (and attaches the apps to that GitHub release),
 # or by hand from the Actions tab ("Run workflow"), where the apps appear as downloadable artifacts.
 name: Build executables
@@ -21,6 +21,8 @@ jobs:
             asset: cgplusplus-linux-x86_64.tar.gz
           - os: windows-2022
             asset: cgplusplus-windows-x86_64.exe
+          - os: macos-15         # Apple Silicon; the app needs macOS 14 or newer
+            asset: cgplusplus-macos-arm64.zip
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
@@ -57,6 +59,12 @@ jobs:
           $p = Start-Process -FilePath "${{ github.workspace }}\dist\cgplusplus.exe" -ArgumentList '--selftest' -Wait -PassThru
           if ($p.ExitCode -ne 0) { throw "self-test failed with exit code $($p.ExitCode)" }
 
+      - name: Self-test (macOS)
+        if: runner.os == 'macOS'
+        working-directory: ${{ runner.temp }}
+        run: |
+          "${{ github.workspace }}/dist/CG++.app/Contents/MacOS/cgplusplus" --selftest
+
       - name: Package (Linux)
         if: runner.os == 'Linux'
         run: tar -czf ${{ matrix.asset }} -C dist cgplusplus -C .. LICENSE README.md
@@ -65,6 +73,10 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: Copy-Item dist\cgplusplus.exe ${{ matrix.asset }}
+
+      - name: Package (macOS)
+        if: runner.os == 'macOS'
+        run: ditto -c -k --keepParent "dist/CG++.app" ${{ matrix.asset }}   # keeps the app's signature intact
 
       - uses: actions/upload-artifact@v7
         with:

@@ -19,6 +19,8 @@ import matplotlib
 import sys
 LAUNCH_DIR = os.getcwd()   # where CG++ was started; the file dialogs open here
 if getattr(sys, 'frozen', False):
+    if LAUNCH_DIR == os.path.abspath(os.sep):   # started from Finder or a desktop menu, not a terminal
+        LAUNCH_DIR = os.path.expanduser('~')
     # Packaged app (PyInstaller): opac/ and the icon live inside the bundle, so read them from there.
     os.chdir(sys._MEIPASS)
     for _stream in ('stdout', 'stderr'):   # a windowed Windows app has no console to print to
@@ -1700,6 +1702,7 @@ WAV_XLABEL = r'$\lambda$ ($\mu$m)'
 SCALES = [1.0, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0]
 PREFS_PATH = os.path.join(os.path.expanduser('~'), '.cgplusplus.json')
 UI = {'scale': 1.0}
+MOD = 'Cmd' if sys.platform == 'darwin' else 'Ctrl'   # how the shortcut key is named here
 
 
 def px(value):
@@ -2887,7 +2890,7 @@ class CGWindow(QtWidgets.QMainWindow):
                         min(SCALES, key=lambda s: abs(s - self.scale)))
         lay.addWidget(seg)
         lay.addWidget(label(f'Suggested for this screen: {format_scale(self.auto)}. '
-                            f'Ctrl + and Ctrl - also change it.', 'key'))
+                            f'{MOD} + and {MOD} - also change it.', 'key'))
         lay.addSpacing(px(14))
         lay.addWidget(label('<b>Font</b>'))
         combo = QtWidgets.QFontComboBox()
@@ -2929,14 +2932,14 @@ class CGWindow(QtWidgets.QMainWindow):
         notes = [
             ('Parameters', 'Hover the small i next to a label for what it means. Rim Hs/Hp is computed by '
                            'the model when set to 0 or below. Albedo has no effect, as scattering is turned off.'),
-            ('Running', 'Press Enter in any field, or Ctrl+R. The window stays responsive while the model '
+            ('Running', f'Press Enter in any field, or {MOD}+R. The window stays responsive while the model '
                         'computes; solver messages appear under Solver log.'),
             ('Observations', 'Load a .dat file with 3 header lines and columns nu, flux, error, style. '
                              'Use Show to toggle them, Remove to unload.'),
             ('Files', 'Models are saved in the same .model format as before. Save SED writes the total and '
                       'component fluxes as columns.'),
             ('Layout', 'Drag the gaps between the panels to resize them.'),
-            ('Size and font', 'Change them under Settings, or use Ctrl + and Ctrl - for the size. '
+            ('Size and font', f'Change them under Settings, or use {MOD} + and {MOD} - for the size. '
                               f'Your choice is remembered in {PREFS_PATH}.'),
             ('License', 'Free software under the GNU General Public License, version 3 or later. '
                         'You may share and modify it under the same terms; it comes with no warranty.'),
