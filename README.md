@@ -19,14 +19,31 @@ The model is an improvement of the model proposed by: Chiang & Goldreich (1997) 
 A port to Python was inspired by the fact that IDL is a legacy paywalled software and CG+ does not run on GDL. The core of the program (cgplus.pro) was rewritten with little change (including comments) and the results of both versions (IDL and Python) must be identical. This script includes a user-interface similar to the one provided by fitcgplus.pro but it was written independently. It has a few additional features such as enhanced figure control, help button and save SED button. Currently there is no plan to do anything more with it but I am open to suggestions.
 
 ## How to use:
-Unzip the archive, go into the directory that is created, execute python script.
-For the script you need numpy, scipy and matplotlib. It was written with Python 3.8
-but other versions may work too.
+For fitting your own data: make a 'mystarname.dat' file with the same format as abaur.dat: frequency in Hz, observed flux in erg/s/cm^2/Hz and the error bars (down and up) in erg/s/cm^2/Hz. If both error bars are taken 0.0 then the code connects all the points with a line. Otherwise they are plotted as points with the error bars given. If they are both -1.0 they will be data points without an error bar. 
 
-For fitting your own data: make a 'mystarname.dat' file with the same
-format as abaur.dat: frequency in Hz, observed flux in erg/s/cm^2/Hz
-and the error bars (down and up) in erg/s/cm^2/Hz. If both error bars
-are taken 0.0 then the code connects all the points with a line. Otherwise
-they are plotted as points with the error bars given. If they are both
--1.0 they will be data points without an error bar. 
+Opacity files are the same as in the original (source unknown). They can be replaced by your own but they must have the same names and style as original.
 
+## Update 2026.10.27:
+
+Computah, make the application prettier. Now there is a new GUI using Qt instead of Tk and available as executable too. See instructions below.
+
+## Download and run
+Ready-made apps for Linux and Windows are attached to each release on the [Releases page](https://github.com/lisastrophys/cgplusplus/releases). They need no Python or other installation.
+
+- **Linux:** download `cgplusplus-linux-x86_64.tar.gz`, unpack it with `tar xzf cgplusplus-linux-x86_64.tar.gz` and start it with `./cgplusplus`. It runs on Ubuntu 22.04, Debian 12, Fedora 36 or newer, and similar systems.
+- **Windows:** download `cgplusplus-windows-x86_64.exe` and double-click it. Windows may warn that the app is unrecognised because it is not signed: click *More info*, then *Run anyway*.
+
+The first start takes a few seconds while the app unpacks itself. Model files, observations and saved SEDs open and save in the folder you start the app from.
+
+## Running from source
+CG++ needs Python 3.10 or older and NumPy below 2.4, plus SciPy, Matplotlib and a Qt binding:
+
+    pip install "numpy<2" scipy matplotlib PySide6     # on Python 3.8 use PyQt5 instead of PySide6
+    python cgplusplus.py
+
+Use `--scale 2` to enlarge the interface on high-resolution screens (also adjustable under Settings).
+
+## License
+CG++ is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License, version 3 or (at your option) any later version. See [LICENSE](LICENSE) for the full text. CG++ comes with no warranty.
+
+The packaged apps also contain third-party libraries under their own licenses, among them Qt for Python (PySide6, LGPL v3), NumPy, SciPy and Matplotlib (BSD-style). The source code of each release is available on its release page.

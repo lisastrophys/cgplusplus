@@ -1,17 +1,33 @@
+# CG++: a Python port of CG+, a model for passive flared protoplanetary disks.
+# Copyright (C) 2025 L. Zwicky
+# Based on CG+ by C.P. Dullemond, C. Dominik and A. Natta (C) 2002.
+#
+# This program is free software: you can redistribute it and/or modify it under the terms of the
+# GNU General Public License as published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without
+# even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License for more details: https://www.gnu.org/licenses/gpl-3.0.html
 import numpy as np
 import os
-import tkinter as tk
-from tkinter import ttk
-# import tkinter.font as tkFont
 from dataclasses import dataclass
 from typing import List
 from scipy.special import erf
 import warnings
 import matplotlib
-matplotlib.use('TkAgg')
+import sys
+LAUNCH_DIR = os.getcwd()   # where CG++ was started; the file dialogs open here
+if getattr(sys, 'frozen', False):
+    # Packaged app (PyInstaller): opac/ and the icon live inside the bundle, so read them from there.
+    os.chdir(sys._MEIPASS)
+    for _stream in ('stdout', 'stderr'):   # a windowed Windows app has no console to print to
+        if getattr(sys, _stream) is None:
+            setattr(sys, _stream, open(os.devnull, 'w'))
+elif not os.path.isdir('opac') and os.path.isdir(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'opac')):
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))   # started from another folder
+# (the Qt and matplotlib-backend imports live in the interface section at the bottom)
 
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
-import matplotlib.pyplot as plt
 '''
 ========================================================================
 
@@ -1566,498 +1582,1358 @@ def run_disk(nr, incl, Tin, Mstar, Lstar, Tstar, Rout, Mdisk, plsig, opac, chiwa
 
     return [a, sed]
 
-window = tk.Tk()
-# print(tkFont.names())
-# custom_font = tkFont.Font(name='TkDefaultFont', size=12)
-window.geometry(f'1450x800')
-fig = plt.figure(1)
-fig.set_tight_layout(True)
-a, sed = run_disk(30, 60, 1500, 2.4, 47, 9520, 400, 0.05, -2, OpacityTable(dnames=['silicate']), 0)
-dpc = 144
-red = 1 / (4 * np.pi * (dpc * pc) ** 2)
-plt.plot(sed['wav']*1e4, sed['lnu']*sed['nu']*red, color='black')
-plt.xlim(left=0.1, right=1000)
-plt.ylim(top=1e-7, bottom=1e-11)
-plt.xscale('log')
-plt.yscale('log')
-plt.xlabel(r'$\lambda$ ($\mu$m)')
-plt.ylabel(r'$\nu F_\nu$ (erg/s/cm$^2$)')
-
-fig2 = plt.figure(2)
-fig2.set_tight_layout(True)
-plt.ion()
-plt.plot(a.r/AU, a.Hs/a.r, label='Hs', color='black', linestyle='dashed')
-plt.plot(a.r/AU, a.Hp/a.r, label='Hp', color='black')
-plt.xscale('log')
-plt.yscale('log')
-plt.xlabel(r'$R$ (AU)')
-plt.ylabel(r'$H/R$')
-plt.legend()
-
-side_frame = tk.Frame(window, width=160, height=800, padx=3)
-side_frame.grid(column=0)
-plot_frame = tk.Frame(window, width=800, height=500, padx=10, highlightbackground='gray', highlightthickness=2)
-plot_frame.grid(column=1, row=0)
-buttons_frame = tk.Frame(window, width=800, height=100, padx=3, pady=3, highlightbackground='gray', highlightthickness=2)
-buttons_frame.grid(column=1, row=1)
-newplot_frame = tk.Frame(window, width=800, height=100, padx=3, pady=3)
-newplot_frame.grid(column=1, row=2)
-file_frame = tk.Frame(window, width=800, height=100, padx=3, pady=3)
-file_frame.grid(column=1, row=3)
-input_frame = tk.Frame(window, width=800, height=100, padx=3, pady=3, highlightbackground='gray', highlightthickness=2)
-input_frame.grid(column=1, row=4)
-dust_frame = tk.Frame(window, width=800, height=100, padx=3, pady=3, highlightbackground='gray', highlightthickness=2)
-dust_frame.grid(column=1, row=5)
-
-plot2_frame = tk.Frame(window, width=600, height=300, padx=10, highlightbackground='gray', highlightthickness=2)
-plot2_frame.grid(column=2, row=0)
-plot2_button_frame = tk.Frame(window, width=600, height=100, padx=10, highlightbackground='gray', highlightthickness=2)
-plot2_button_frame.grid(column=2, row=1)
-
-canvas = FigureCanvasTkAgg(fig, master=plot_frame)
-plot_widget = canvas.get_tk_widget()
-toolbar = NavigationToolbar2Tk(canvas, plot_frame)
-toolbar.update()
-
-canvas2 = FigureCanvasTkAgg(fig2, master=plot2_frame)
-plot2_widget = canvas2.get_tk_widget()
-toolbar2 = NavigationToolbar2Tk(canvas2, plot2_frame)
-toolbar2.update()
-#
-# canvas.get_tk_widget()
-
-def update():
-    global a, sed
-    nr = int(nr_var.get())
-    incl = float(incl_var.get())
-    mstar = float(ms_var.get())
-    lstar = float(ls_var.get())
-    tstar = float(ts_var.get())
-    rout = float(rout_var.get())
-    mdisk = float(mdisk_var.get())
-    plsig = float(plsig_var.get())
-    tin = float(tin_var.get())
-    chiwall = float(chi_var.get())
-    dust_names = []
-    dust_abun = []
-    if float(silicate_var.get())>0:
-        dust_names.append('silicate')
-        dust_abun.append(float(silicate_var.get()))
-    if float(forsterite_var.get())>0:
-        dust_names.append('forsterite')
-        dust_abun.append(float(forsterite_var.get()))
-    if float(silbeta1_var.get())>0:
-        dust_names.append('silbeta1')
-        dust_abun.append(float(silbeta1_var.get()))
-    if float(carbon_var.get())>0:
-        dust_names.append('carbon')
-        dust_abun.append(float(carbon_var.get()))
-    if float(ice_var.get())>0:
-        dust_names.append('ice')
-        dust_abun.append(float(ice_var.get()))
-    opac = OpacityTable(dnames=dust_names, abun=dust_abun)
-
-    a, sed = run_disk(nr, incl, tin, mstar, lstar, tstar, rout, mdisk, plsig, opac, chiwall)
-    dpc = float(dist_var.get())
-    red = 1 / (4 * np.pi * (dpc * pc) ** 2)
-    plt.figure(1)
-    fig.clear()
-    plt.plot(sed['wav']*1e4, sed['lnu']*sed['nu']*red, color='black')
-    if not is_totflux.get():
-        plt.plot(sed['wav'] * 1e4, sed['lnu'] * sed['nu'] * red, color='black')
-        plt.plot(sed['wav'] * 1e4, sed['lnu_star'] * sed['nu'] * red, label='star')
-        plt.plot(sed['wav'] * 1e4, sed['lnu_mid'] * sed['nu'] * red, label='midplane')
-        plt.plot(sed['wav'] * 1e4, sed['lnu_wall'] * sed['nu'] * red, label='wall')
-        plt.plot(sed['wav'] * 1e4, sed['lnu_surf'] * sed['nu'] * red, label='surface')
-        plt.legend()
-
-    if show_allpoints.get():
-        plt.ylim(bottom=min(sed['lnu'] * sed['nu'] * red), top=max(sed['lnu'] * sed['nu'] * red))
-        plt.xlim(left=min(sed['wav'] * 1e4), right=max(sed['wav'] * 1e4))
-    else:
-        plt.ylim(bottom=float(ymin_var.get()), top=float(ymax_var.get()))
-        plt.xlim(left=0.1, right=1000)
-    plt.xscale('log')
-    plt.yscale(yscale_var.get())
-
-    plt.xlabel(r'$\lambda$ ($\mu$m)')
-    plt.ylabel(r'$\nu F_\nu$ (erg/s/cm$^2$)')
-
-    change_plottype()
-
-def change_yscale():
-    plt.figure(1)
-    plt.yscale(yscale_var.get())
-
-def change_plotstyle():
-    plt.figure(1)
-    if is_totflux.get():
-        fig.clear()
-        plt.plot(sed['wav'] * 1e4, sed['lnu'] * sed['nu'] * red, color='black')
-    else:
-        fig.clear()
-        plt.plot(sed['wav'] * 1e4, sed['lnu'] * sed['nu'] * red, color='black')
-        plt.plot(sed['wav']*1e4, sed['lnu_star']*sed['nu']*red, label='star')
-        plt.plot(sed['wav']*1e4, sed['lnu_mid']*sed['nu']*red, label='midplane')
-        plt.plot(sed['wav']*1e4, sed['lnu_wall']*sed['nu']*red, label='wall')
-        plt.plot(sed['wav']*1e4, sed['lnu_surf']*sed['nu']*red, label='surface')
-        plt.legend()
-
-    plt.yscale(yscale_var.get())
-    plt.xscale('log')
-    if show_allpoints.get():
-        plt.ylim(bottom=min(sed['lnu'] * sed['nu'] * red), top=max(sed['lnu'] * sed['nu'] * red))
-        plt.xlim(left=min(sed['wav'] * 1e4), right=max(sed['wav'] * 1e4))
-    else:
-        plt.ylim(bottom=float(ymin_var.get()), top=float(ymax_var.get()))
-        plt.xlim(left=0.1, right=1000)
-    plt.xlabel(r'$\lambda$ ($\mu$m)')
-    plt.ylabel(r'$\nu F_\nu$ (erg/s/cm$^2$)')
-
-def showallpoints():
-    plt.figure(1)
-    if show_allpoints.get():
-        plt.ylim(bottom=min(sed['lnu'] * sed['nu'] * red), top=max(sed['lnu'] * sed['nu'] * red))
-        plt.xlim(left=min(sed['wav']*1e4), right=max(sed['wav']*1e4))
-    else:
-        plt.ylim(bottom=float(ymin_var.get()), top=float(ymax_var.get()))
-        plt.xlim(left=0.1, right=1000)
-
-def reset_button():
-    ymin_var.set(value=1e-11)
-    ymax_var.set(value=1e-7)
-    showallpoints()
-
-def change_plottype():
-    plt.figure(2)
-    if plot_type.get() == 'hr':
-        fig2.clear()
-        plt.plot(a.r/AU, a.Hs / a.r, label='Hs', color='black', linestyle='dashed')
-        plt.plot(a.r/AU, a.Hp / a.r, label='Hp', color='black')
-        plt.xscale('log')
-        plt.yscale('log')
-        plt.xlabel(r'$R$ (AU)')
-        plt.ylabel(r'$H/R$')
-        plt.legend()
-    elif plot_type.get() == 'T':
-        fig2.clear()
-        plt.plot(a.r/AU, a.Ti, label='Ti', color='black')
-        plt.plot(a.r/AU, a.Ts, label='Ts', color='black', linestyle='dashed')
-        plt.xscale('log')
-        plt.yscale('log')
-        plt.xlabel(r'$R$ (AU)')
-        plt.ylabel(r'$T$ (K)')
-        plt.legend()
-    elif plot_type.get() == 'sigma':
-        fig2.clear()
-        plt.plot(a.r/AU, a.Sigma, color='black')
-        plt.xscale('log')
-        plt.yscale('log')
-        plt.xlabel(r'$R$ (AU)')
-        plt.ylabel(r'Dust Surface Density')
-    elif plot_type.get() == 'tau':
-        rtau = findtauradii(a.opac, a.Sigma, a.r, a.Ti)
-        fig2.clear()
-        plt.plot(sed['wav']*1e4, rtau/AU, color='black')
-        plt.xscale('log')
-        plt.xlim(left=0.1, right=10000)
-        plt.yscale('log')
-        plt.ylim(bottom=0.1, top=1000)
-        plt.xlabel(r'$\lambda$ ($\mu$m)')
-        plt.ylabel(r'Radius for $\tau = 1$ (AU)')
-
-def save_model():
-    save_frame = tk.Frame(window, width=600, height=200, padx=10, highlightbackground='gray',
-                                  highlightthickness=2)
-    save_frame.grid(column=2, row=2)
-    tk.Label(save_frame, text=f'Save current settings in ').grid(row=0, column=0)
-    model_name = tk.StringVar(value='.model')
-    tk.Entry(save_frame, textvariable=model_name, width=20).grid(row=0, column=1)
-
-    def save_button():
-        with open(model_name.get(), 'w') as file:
-            print(f'Nr:      {nr_var.get()}', file=file)
-            print(f'Distance[pc]:       {dist_var.get()}', file=file)
-            print(f'Inclination[degrees]:       {incl_var.get()}', file=file)
-            print(f'Starmass[MS]:       {ms_var.get()}', file=file)
-            print(f'Starluminosity[LS]:       {ls_var.get()}', file=file)
-            print(f'Startemperature[K]:       {ts_var.get()}', file=file)
-            print(f'Outer_disk-radius[AU]:       {rout_var.get()}', file=file)
-            print(f'Mdisk:    {mdisk_var.get()}', file=file)
-            print(f'Plsigma:      {plsig_var.get()}', file=file)
-            print(f'silicate:       {silicate_var.get()}', file=file)
-            print(f'carbon:       {carbon_var.get()}', file=file)
-            print(f'forsterite:       {forsterite_var.get()}', file=file)
-            print(f'ice:       {ice_var.get()}', file=file)
-            print(f'silbeta1:       {silbeta1_var.get()}', file=file)
-            print(f'Inner Disk temp.:       {tin_var.get()}', file=file)
-            print(f'Chi:       {chi_var.get()}', file=file)
-            print(f'Albedo:       {albedo_var.get()}', file=file)
-            print(f'Yrange[0]:   {ymin_var.get()}', file=file)
-            print(f'Yrange[1]:   {ymax_var.get()}', file=file)
-
-    def cancel_button():
-        save_frame.grid_forget()
-        save_frame.destroy()
-
-    tk.Button(save_frame, text="Save", command=save_button).grid(row=1, column=0)
-    tk.Button(save_frame, text="Cancel", command=cancel_button).grid(row=1, column=1)
-
-def load_model():
-    out = {}
-    with open(model_var.get(), 'r') as file:
-        for line in file.readlines():
-            key, value = [entry.strip() for entry in line.split(':')]
-            out[key] = value
-
-    nr_var.set(f"{(int(float(out['Nr'])))}")
-    dist_var.set(f"{float(out['Distance[pc]'])}")
-    incl_var.set(f"{float(out['Inclination[degrees]'])}")
-    ms_var.set(f"{float(out['Starmass[MS]'])}")
-    ls_var.set(f"{float(out['Starluminosity[LS]'])}")
-    ts_var.set(f"{float(out['Startemperature[K]'])}")
-    rout_var.set(f"{float(out['Outer_disk-radius[AU]'])}")
-    mdisk_var.set(f"{float(out['Mdisk'])}")
-    plsig_var.set(f"{float(out['Plsigma'])}")
-    silicate_var.set(f"{float(out['silicate'])}")
-    carbon_var.set(f"{float(out['carbon'])}")
-    forsterite_var.set(f"{float(out['forsterite'])}")
-    ice_var.set(f"{float(out['ice'])}")
-    silbeta1_var.set(f"{float(out['silbeta1'])}")
-    tin_var.set(f"{float(out['Inner Disk temp.'])}")
-    chi_var.set(f"{float(out['Chi'])}")
-    albedo_var.set(f"{float(out['Albedo'])}")
-    ymin_var.set(f"{float(out['Yrange[0]']):.2e}")
-    ymax_var.set(f"{float(out['Yrange[1]']):.2e}")
-
-    update()
-
-def load_obs(event):
-    data = np.loadtxt(obs_var.get(), skiprows=3)
-    nu = data[:, 0]
-    flux = data[:, 1]
-    flux_err = data[:, 2]
-    style = data[:, 3]
-    wav = cc/nu * 1e4
-
-    plt.figure(1)
-    change_plotstyle()
-    if is_line.get():
-        line_mask = style == 0
-        plt.plot(wav[line_mask], flux[line_mask]*nu[line_mask], color='gray')
-
-        error_mask = (style != 0) & (flux_err > 0)
-        plt.errorbar(wav[error_mask], flux[error_mask]*nu[error_mask], yerr=flux_err[error_mask]*nu[error_mask], color='gray')
-
-        point_mask = (style != 0) & (flux_err <= 0)
-        plt.scatter(wav[point_mask], flux[point_mask]*nu[point_mask], color='gray', marker='^')
-    else:
-        error_mask = (flux_err > 0)
-        plt.errorbar(wav[error_mask], flux[error_mask] * nu[error_mask], yerr=flux_err[error_mask] * nu[error_mask],
-                     color='gray')
-
-        point_mask = (flux_err <= 0)
-        plt.scatter(wav[point_mask], flux[point_mask] * nu[point_mask], color='gray', marker='^')
-
-def load_obs2():
-    if obs_var.get() == '':
-        return
-    data = np.loadtxt(obs_var.get(), skiprows=3)
-    nu = data[:, 0]
-    flux = data[:, 1]
-    flux_err = data[:, 2]
-    style = data[:, 3]
-    wav = cc / nu * 1e4
-
-    plt.figure(1)
-    change_plotstyle()
-    if is_line.get():
-        line_mask = style == 0
-        plt.plot(wav[line_mask], flux[line_mask] * nu[line_mask], color='gray')
-
-        error_mask = (style != 0) & (flux_err > 0)
-        plt.errorbar(wav[error_mask], flux[error_mask] * nu[error_mask], yerr=flux_err[error_mask] * nu[error_mask],
-                     color='gray')
-
-        point_mask = (style != 0) & (flux_err <= 0)
-        plt.scatter(wav[point_mask], flux[point_mask] * nu[point_mask], color='gray', marker='^')
-    else:
-        error_mask = (flux_err > 0)
-        plt.errorbar(wav[error_mask], flux[error_mask] * nu[error_mask], yerr=flux_err[error_mask] * nu[error_mask],
-                     color='gray')
-
-        point_mask = (flux_err <= 0)
-        plt.scatter(wav[point_mask], flux[point_mask] * nu[point_mask], color='gray', marker='^')
-
-def save_sed():
-    dpc = float(dist_var.get())
-    red = 1 / (4 * np.pi * (dpc * pc) ** 2)
-    with open('sed.out', 'w') as file:
-        print('#wavelength     total          star          wall       midplane       surface', file=file)
-        for inu in range(len(sed['wav'])-1, -1, -1):
-            print(f"{sed['wav'][inu]*1e4:.4e}   {sed['lnu'][inu]*sed['nu'][inu]*red:.5e}   {sed['lnu_star'][inu]*sed['nu'][inu]*red:.5e}   "
-                  f"{sed['lnu_wall'][inu]*sed['nu'][inu]*red:.5e}   {sed['lnu_mid'][inu]*sed['nu'][inu]*red:.5e}   {sed['lnu_surf'][inu]*sed['nu'][inu]*red:.5e}", file=file)
-
-def help_button():
-    popup = tk.Toplevel()
-    popup.wm_title('Help')
-
-    textmessage = 'Welcome to CG++, here are some notes for this interface\n\n' \
-                  'Variables that can be misunderstood:\n\n' \
-                  'N_r --- number of radial cells in a grid\n\n' \
-                  'disk size --- outer radius of the disk\n\n' \
-                  'plsig --- power law exponent for surface density, Sigma(R) = Sigma0*(R/Rc)**plsigma\n\n' \
-                  'chi* --- Hs/Hp (scale heights) ratio (only for the inner rim!!)\n\n' \
-                  'albedo* does not do anything as scattering is turned off\n\n' \
-                  '* means if the value of parameter is <=0 then it will be calculated by the script\n\n' \
-                  'To remove observations from the plot click either Total flux or Components\n\n' \
-                  'To put them back click either Line or Symbol\n\n' \
-                  'My email if something is really bad: lis.zwicky@csfk.org'
-
-    tk.Label(popup, text=textmessage).grid(row=0, column=0)
-
-    b = ttk.Button(popup, text="Okay", command=popup.destroy)
-    b.grid(row=1, column=0)
-
-def showopac():
-
-    fig3 = plt.figure(3)
-    if show_opac.get():
-        fig3.set_tight_layout(True)
-        plt.ion()
-        kappa = findkappa(a.opac, 0)
-        plt.plot(sed['wav'] * 1e4, kappa, color='black')
-        plt.yscale('log')
-        plt.xscale('log')
-        plt.xlim(left=0.1, right=1000)
-        plt.xlabel(r'$\lambda$ ($\mu$m)')
-        plt.ylabel(r'Opacity')
-    else:
-        plt.close(fig=fig3)
-
-
-plot_widget.pack()
-plot2_widget.pack()
-tk.Button(side_frame,text="Quit",command=exit).grid(row=0, column=0, padx=5)
-tk.Button(side_frame,text="Help",command=help_button).grid(row=1, column=0, padx=5)
-
-yscale_var = tk.StringVar(value='log')
-tk.Radiobutton(buttons_frame, text='Y lin', variable=yscale_var, value='linear', command=change_yscale).grid(row=0, column=0)
-tk.Radiobutton(buttons_frame, text='Y log', variable=yscale_var, value='log', command=change_yscale).grid(row=0, column=1)
-
-is_line = tk.BooleanVar(value=True)
-tk.Radiobutton(buttons_frame, text='Line', variable=is_line, value=True, command=load_obs2).grid(row=0, column=2)
-tk.Radiobutton(buttons_frame, text='Symbol', variable=is_line, value=False, command=load_obs2).grid(row=0, column=3)
-
-is_totflux = tk.BooleanVar(value=True)
-tk.Radiobutton(buttons_frame, text='Total flux', variable=is_totflux, value=True, command=change_plotstyle).grid(row=0, column=4)
-tk.Radiobutton(buttons_frame, text='Components', variable=is_totflux, value=False, command=change_plotstyle).grid(row=0, column=5)
-
-show_opac = tk.BooleanVar(value=False)
-show_allpoints = tk.BooleanVar(value=False)
-tk.Checkbutton(buttons_frame, text='Show opacity', variable=show_opac, onvalue=True, offvalue=False,
-               command=showopac).grid(row=1, column=0, columnspan=2)
-tk.Checkbutton(buttons_frame, text='View all points', variable=show_allpoints, onvalue=True, offvalue=False,
-               command=showallpoints).grid(row=1, column=2, columnspan=2)
-tk.Label(buttons_frame, text='ymin-ymax').grid(row=1, column=4)
-ymin_var = tk.StringVar(value='1e-11')
-tk.Entry(buttons_frame, textvariable=ymin_var, width=10).grid(row=1, column=5)
-ymax_var = tk.StringVar(value='1e-7')
-tk.Entry(buttons_frame, textvariable=ymax_var, width=10).grid(row=1, column=6)
-
-tk.Button(newplot_frame,text="New plot",command=update).grid(row=0, column=0)
-tk.Button(newplot_frame,text="Reset",command=reset_button).grid(row=0, column=1)
-tk.Button(newplot_frame,text="Save SED",command=save_sed).grid(row=0, column=2)
-
-obs_var = tk.StringVar()
-tk.Label(file_frame, text=f'obs file: ').grid(row=0, column=0)
-obs_box = ttk.Combobox(file_frame,textvariable=obs_var, values=find_dat())
-obs_box.grid(row=0, column=1)
-obs_box.bind('<<ComboboxSelected>>', load_obs)
-tk.Button(file_frame,text="Save model",command=save_model).grid(row=0, column=2)
-model_var = tk.StringVar()
-tk.Button(file_frame,text="Load model: ",command=load_model).grid(row=0, column=3)
-model_box = ttk.Combobox(file_frame,textvariable=model_var, values=find_model())
-model_box.grid(row=0, column=4)
-
-
-tk.Label(input_frame, text='N_r').grid(row=0, column=0)
-nr_var = tk.StringVar(value='30')
-tk.Entry(input_frame, textvariable=nr_var, width=10).grid(row=0, column=1)
-
-tk.Label(input_frame, text='star mass (Msun)').grid(row=0, column=2, padx=5)
-ms_var = tk.StringVar(value='2.4')
-tk.Entry(input_frame, textvariable=ms_var, width=10).grid(row=0, column=3)
-
-tk.Label(input_frame, text='disk size (AU)').grid(row=0, column=4)
-rout_var = tk.StringVar(value='400')
-tk.Entry(input_frame, textvariable=rout_var, width=10).grid(row=0, column=5)
-
-tk.Label(input_frame, text='distance (pc)').grid(row=1, column=0)
-dist_var = tk.StringVar(value='144.0')
-tk.Entry(input_frame, textvariable=dist_var, width=10).grid(row=1, column=1)
-
-tk.Label(input_frame, text='star lum (Lsun)').grid(row=1, column=2, padx=5)
-ls_var = tk.StringVar(value='47.0')
-tk.Entry(input_frame, textvariable=ls_var, width=10).grid(row=1, column=3)
-
-tk.Label(input_frame, text='disk mass (Msun)').grid(row=1, column=4)
-mdisk_var = tk.StringVar(value='0.05')
-tk.Entry(input_frame, textvariable=mdisk_var, width=10).grid(row=1, column=5)
-
-tk.Label(input_frame, text='incl (deg)').grid(row=2, column=0)
-incl_var = tk.StringVar(value='60.0')
-tk.Entry(input_frame, textvariable=incl_var, width=10).grid(row=2, column=1)
-
-tk.Label(input_frame, text='star temp (K)').grid(row=2, column=2)
-ts_var = tk.StringVar(value='9520.0')
-tk.Entry(input_frame, textvariable=ts_var, width=10).grid(row=2, column=3)
-
-tk.Label(input_frame, text='plsig').grid(row=2, column=4)
-plsig_var = tk.StringVar(value='-2.0')
-tk.Entry(input_frame, textvariable=plsig_var, width=10).grid(row=2, column=5)
-
-tk.Label(dust_frame, text='silicate').grid(row=0, column=0)
-silicate_var = tk.StringVar(value='1.00')
-tk.Entry(dust_frame, textvariable=silicate_var, width=10).grid(row=0, column=1)
-
-tk.Label(dust_frame, text='carbon').grid(row=0, column=2, padx=5)
-carbon_var = tk.StringVar(value='0.00')
-tk.Entry(dust_frame, textvariable=carbon_var, width=10).grid(row=0, column=3)
-
-tk.Label(dust_frame, text='T_in (K)').grid(row=0, column=4)
-tin_var = tk.StringVar(value='1500')
-tk.Entry(dust_frame, textvariable=tin_var, width=10).grid(row=0, column=5)
-
-tk.Label(dust_frame, text='forsterite').grid(row=1, column=0)
-forsterite_var = tk.StringVar(value='0.00')
-tk.Entry(dust_frame, textvariable=forsterite_var, width=10).grid(row=1, column=1)
-
-tk.Label(dust_frame, text='ice').grid(row=1, column=2, padx=5)
-ice_var = tk.StringVar(value='0.00')
-tk.Entry(dust_frame, textvariable=ice_var, width=10).grid(row=1, column=3)
-
-tk.Label(dust_frame, text='chi*').grid(row=1, column=4)
-chi_var = tk.StringVar(value='0')
-tk.Entry(dust_frame, textvariable=chi_var, width=10).grid(row=1, column=5)
-
-tk.Label(dust_frame, text='silbeta1').grid(row=2, column=0)
-silbeta1_var = tk.StringVar(value='0.00')
-tk.Entry(dust_frame, textvariable=silbeta1_var, width=10).grid(row=2, column=1)
-
-# tk.Label(dust_frame, text='star temp (K)').grid(row=2, column=2)
-# ts_var = tk.StringVar(value='9520.0')
-# tk.Entry(dust_frame, textvariable=ts_var, width=10).grid(row=2, column=3)
-
-tk.Label(dust_frame, text='albedo*').grid(row=2, column=4)
-albedo_var = tk.StringVar(value='0')
-tk.Entry(dust_frame, textvariable=albedo_var, width=10).grid(row=2, column=5)
-
-plot_type = tk.StringVar(value='hr')
-tk.Radiobutton(plot2_button_frame, text='Plot temperature(R)', variable=plot_type, value='T', command=change_plottype).grid(row=0, column=0)
-tk.Radiobutton(plot2_button_frame, text='Plot height(R)', variable=plot_type, value='hr', command=change_plottype).grid(row=1, column=0)
-tk.Radiobutton(plot2_button_frame, text='Plot surface density(R)', variable=plot_type, value='sigma', command=change_plottype).grid(row=0, column=1)
-tk.Radiobutton(plot2_button_frame, text='Plot tau', variable=plot_type, value='tau', command=change_plottype).grid(row=1, column=1)
-
-
-window.mainloop()
+'''
+========================================================================
+                       GRAPHICAL INTERFACE (Qt)
+  Everything above this line is the computational core and is unchanged.
+  The interface below only calls OpacityTable, run_disk, findkappa and
+  findtauradii, and plots their results.
+
+  Needs one Qt binding: PySide6 (Python 3.9+), or PyQt5 / PySide2,
+  which also work on Python 3.8.   pip install PyQt5
+  Run it from the folder that contains opac/.
+========================================================================
+'''
+import io
+import re
+import sys
+import json
+import time
+import queue
+import threading
+import contextlib
+import traceback
+
+QT6 = False
+try:
+    from PySide6 import QtCore, QtGui, QtWidgets
+    QT6 = True
+except ImportError:
+    try:
+        from PyQt5 import QtCore, QtGui, QtWidgets
+    except ImportError:
+        try:
+            from PySide2 import QtCore, QtGui, QtWidgets
+        except ImportError:
+            sys.exit('CG++ needs Qt for Python. Install it with:  pip install PyQt5   (or PySide6)')
+
+# imported after the binding, so matplotlib picks the same one
+try:
+    from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg, NavigationToolbar2QT
+except ImportError:   # matplotlib older than 3.5
+    from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
+from matplotlib.figure import Figure
+from matplotlib import font_manager
+
+Qt = QtCore.Qt
+QShortcut = getattr(QtGui, 'QShortcut', None) or QtWidgets.QShortcut
+
+
+def qexec(obj):
+    '''exec() for every binding (PySide2 only has exec_).'''
+    return obj.exec() if hasattr(obj, 'exec') else obj.exec_()
+
+
+# ---------------------------------------------------------------- palette
+INK = '#1E2235'          # sidebar, primary text, total-flux curve
+INK_2 = '#2A2F47'        # sidebar inputs
+INK_3 = '#3B415E'        # sidebar borders
+SIDE_TEXT = '#EEF0F7'
+SIDE_LABEL = '#CDD1E0'
+SIDE_MUTED = '#9097B2'
+BLUE = '#5BCEFA'         # trans flag blue: primary actions, focus
+BLUE_HOVER = '#80DAFB'
+BLUE_PRESS = '#3FBEEE'
+BLUE_PALE = '#DDF3FD'
+BLUE_PALE_2 = '#C8EBFB'
+PINK = '#F5A9B8'         # trans flag pink: headings, secondary actions
+PINK_DEEP = '#E58FA2'
+PINK_PALE = '#FCE6EB'
+PINK_PALE_2 = '#F9D3DC'
+WHITE = '#FFFFFF'
+CANVAS_BG = '#F3F6FA'
+CARD = '#FFFFFF'
+CARD_LINE = '#DFE4EC'
+TEXT = '#1E2235'
+TEXT_2 = '#5D6479'
+CHIP = '#EBEFF5'
+CHIP_HOVER = '#DFE5EE'
+ERROR = '#D0533F'
+OK = '#3AAE8C'
+STALE = PINK_DEEP
+
+# curve colours: pastel family, deepened enough to read on white
+C_STAR = '#E8A33D'
+C_WALL = '#E07A93'
+C_MID = '#3A9FD8'
+C_SURF = '#8E7CC3'
+C_OBS = '#8A8F99'
+
+# ---------------------------------------------------------------- parameters
+# (key, label, unit, default, tooltip)
+SECTIONS = [
+    ('Star', [
+        ('ms', 'Mass', 'Msun', '2.4', None),
+        ('ls', 'Luminosity', 'Lsun', '47.0', None),
+        ('ts', 'Temperature', 'K', '9520.0', None),
+    ]),
+    ('Disk', [
+        ('mdisk', 'Mass', 'Msun', '0.05', None),
+        ('rout', 'Outer radius', 'AU', '400', 'Outer radius of the disk.'),
+        ('plsig', 'Sigma power law', '', '-2.0',
+         'Power-law exponent of the surface density:\nSigma(R) = Sigma0 * (R/Rc)^plsig'),
+        ('tin', 'Rim temperature', 'K', '1500', 'Temperature of the inner rim (T_in).'),
+        ('chi', 'Rim Hs/Hp', '', '0',
+         'Ratio of surface to pressure scale height, inner rim only.\n'
+         'Set to 0 or below to let the model compute it.'),
+    ]),
+    ('Observer', [
+        ('dist', 'Distance', 'pc', '144.0', None),
+        ('incl', 'Inclination', 'deg', '60.0', None),
+    ]),
+    ('Dust composition', [
+        ('silicate', 'Silicate', '', '1.00', None),
+        ('forsterite', 'Forsterite', '', '0.00', None),
+        ('silbeta1', 'Silbeta1', '', '0.00', None),
+        ('carbon', 'Carbon', '', '0.00', None),
+        ('ice', 'Ice', '', '0.00', None),
+        ('albedo', 'Albedo', '', '0',
+         'Kept for model files only: scattering is turned off,\nso this value has no effect.'),
+    ]),
+    ('Grid', [
+        ('nr', 'Radial cells', '', '30', 'Number of radial cells in the grid (N_r).'),
+    ]),
+]
+DUST_KEYS = ['silicate', 'forsterite', 'silbeta1', 'carbon', 'ice']
+DUST_TIP = 'Relative abundance. 0 leaves the species out;\nabundances are normalised to their sum.'
+INT_KEYS = {'nr'}
+LABELS = {k: lab for _, rows in SECTIONS for k, lab, *_ in rows}
+DEFAULTS = {k: d for _, rows in SECTIONS for k, _, _, d, _ in rows}
+
+# The .model file layout, identical to the original interface
+MODEL_FILE_LINES = [
+    ('nr', 'Nr:      '), ('dist', 'Distance[pc]:       '),
+    ('incl', 'Inclination[degrees]:       '), ('ms', 'Starmass[MS]:       '),
+    ('ls', 'Starluminosity[LS]:       '), ('ts', 'Startemperature[K]:       '),
+    ('rout', 'Outer_disk-radius[AU]:       '), ('mdisk', 'Mdisk:    '),
+    ('plsig', 'Plsigma:      '), ('silicate', 'silicate:       '),
+    ('carbon', 'carbon:       '), ('forsterite', 'forsterite:       '),
+    ('ice', 'ice:       '), ('silbeta1', 'silbeta1:       '),
+    ('tin', 'Inner Disk temp.:       '), ('chi', 'Chi:       '),
+    ('albedo', 'Albedo:       '), ('ymin', 'Yrange[0]:   '), ('ymax', 'Yrange[1]:   '),
+]
+
+SED_YLABEL = r'$\nu F_\nu$ (erg/s/cm$^2$)'
+WAV_XLABEL = r'$\lambda$ ($\mu$m)'
+
+SCALES = [1.0, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0]
+PREFS_PATH = os.path.join(os.path.expanduser('~'), '.cgplusplus.json')
+UI = {'scale': 1.0}
+
+
+def px(value):
+    '''Scale a size given in pixels at 100 % to the current interface size.'''
+    return max(1, int(round(value * UI['scale'])))
+
+
+def load_prefs():
+    try:
+        with open(PREFS_PATH) as f:
+            prefs = json.load(f)
+        return prefs if isinstance(prefs, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def save_prefs(prefs):
+    try:
+        with open(PREFS_PATH, 'w') as f:
+            json.dump(prefs, f, indent=1)
+    except OSError:
+        pass
+
+
+def auto_scale(app):
+    '''Qt already scales for the OS where the OS tells it to; this covers the rest
+    (typically X11 reporting 96 dpi on a high-resolution panel).'''
+    screen = app.primaryScreen()
+    width = screen.geometry().width() if screen else 1440
+    guess = max(1.0, width / 1440)
+    return min(SCALES, key=lambda s: abs(s - guess))
+
+
+def format_scale(s):
+    return f'{int(round(s * 100))}%'
+
+
+def stylesheet(family):
+    f = f'"{family}"'
+    return f'''
+    * {{ font-family: {f}; font-size: {px(13)}px; color: {TEXT}; }}
+    QMainWindow, QWidget#main {{ background: {CANVAS_BG}; }}
+    QToolTip {{ background: {WHITE}; color: {TEXT}; border: {px(2)}px solid {PINK};
+                padding: {px(6)}px {px(8)}px; font-size: {px(12)}px; }}
+
+    QWidget#sidebar, QWidget#sidebarBody, QScrollArea#sideScroll {{ background: {INK}; border: none; }}
+    QWidget#sidebar QLabel {{ color: {SIDE_LABEL}; background: transparent; }}
+    QWidget#sidebar QLabel#brand {{ color: {SIDE_TEXT}; font-size: {px(29)}px; font-weight: bold; }}
+    QWidget#sidebar QLabel#tagline, QWidget#sidebar QLabel#unit, QWidget#sidebar QLabel#hint {{ color: {SIDE_MUTED}; font-size: {px(12)}px; }}
+    QWidget#sidebar QLabel#section {{ color: {PINK}; font-weight: bold; padding-top: {px(10)}px; }}
+    QWidget#sidebar QLabel#badge {{ color: {SIDE_TEXT}; background: {INK_3}; border-radius: {px(8)}px;
+                    font-size: {px(11)}px; font-weight: bold;
+                    min-width: {px(16)}px; max-width: {px(16)}px; min-height: {px(16)}px; max-height: {px(16)}px; }}
+    QLineEdit#param {{ background: {INK_2}; color: {SIDE_TEXT}; border: {px(1)}px solid {INK_3};
+                       border-radius: {px(4)}px; padding: {px(4)}px {px(7)}px;
+                       selection-background-color: {BLUE}; selection-color: {INK}; }}
+    QLineEdit#param:focus {{ border-color: {BLUE}; }}
+    QLineEdit#param[error="true"] {{ border-color: {ERROR}; }}
+    QFrame#rule {{ background: {INK_3}; max-height: {px(1)}px; min-height: {px(1)}px; }}
+
+    QScrollBar:vertical {{ background: transparent; width: {px(8)}px; margin: 0; }}
+    QScrollBar::handle:vertical {{ background: {INK_3}; border-radius: {px(4)}px; min-height: {px(30)}px; }}
+    QScrollBar::add-line, QScrollBar::sub-line {{ height: 0; }}
+    QScrollBar::add-page, QScrollBar::sub-page {{ background: transparent; }}
+    QPlainTextEdit QScrollBar::handle:vertical {{ background: {CHIP_HOVER}; }}
+
+    QPushButton {{ border: none; border-radius: {px(6)}px; padding: {px(6)}px {px(12)}px; }}
+    QPushButton:focus {{ outline: none; }}
+    QPushButton#primary {{ background: {BLUE}; color: {INK}; font-size: {px(15)}px; font-weight: bold;
+                           padding: {px(10)}px; }}
+    QPushButton#primary:hover {{ background: {BLUE_HOVER}; }}
+    QPushButton#primary:pressed {{ background: {BLUE_PRESS}; }}
+    QPushButton#primary:disabled {{ background: {INK_3}; color: {SIDE_MUTED}; }}
+    QPushButton#dark {{ background: {INK_2}; color: {SIDE_TEXT}; padding: {px(7)}px {px(6)}px; }}
+    QPushButton#dark:hover {{ background: {INK_3}; }}
+    QPushButton#pink {{ background: {PINK_PALE}; }}
+    QPushButton#pink:hover {{ background: {PINK_PALE_2}; }}
+    QPushButton#pink:pressed {{ background: {PINK}; }}
+    QPushButton#ghost {{ background: transparent; color: {TEXT_2}; padding: {px(4)}px {px(10)}px; }}
+    QPushButton#ghost:hover {{ background: {CHIP}; }}
+    QPushButton#apply {{ background: {BLUE}; color: {INK}; font-weight: bold; }}
+    QPushButton#apply:hover {{ background: {BLUE_HOVER}; }}
+
+    QFrame#segbox {{ background: {CHIP}; border-radius: {px(6)}px; }}
+    QPushButton#seg {{ background: transparent; color: {TEXT_2}; border-radius: {px(4)}px;
+                       padding: {px(4)}px {px(11)}px; }}
+    QPushButton#seg:hover {{ background: {CHIP_HOVER}; }}
+    QPushButton#seg:checked {{ background: {BLUE_PALE}; color: {TEXT}; }}
+
+    QFrame#card {{ background: {CARD}; border: {px(1)}px solid {CARD_LINE}; border-radius: {px(10)}px; }}
+    QFrame#card QLabel, QFrame#card QCheckBox {{ background: transparent; }}
+    QLabel#title {{ font-size: {px(16)}px; font-weight: bold; }}
+    QLabel#muted {{ color: {TEXT_2}; }}
+    QLabel#key {{ color: {TEXT_2}; font-size: {px(12)}px; }}
+    QLabel#value {{ font-weight: bold; }}
+    QLabel#status {{ color: {TEXT_2}; }}
+    QLabel#status[error="true"] {{ color: {ERROR}; }}
+    QLineEdit#yrange {{ background: {CHIP}; border: {px(1)}px solid {CHIP}; border-radius: {px(4)}px;
+                        padding: {px(3)}px {px(6)}px; }}
+    QLineEdit#yrange:focus {{ border-color: {BLUE}; }}
+    QLineEdit#yrange[error="true"] {{ border-color: {ERROR}; }}
+    QCheckBox {{ spacing: {px(6)}px; }}
+    QCheckBox::indicator {{ width: {px(14)}px; height: {px(14)}px; border-radius: {px(3)}px;
+                           border: {px(1)}px solid #B9C0CC; background: {WHITE}; }}
+    QCheckBox::indicator:hover {{ border-color: {PINK_DEEP}; }}
+    QCheckBox::indicator:checked {{ background: {PINK}; border-color: {PINK_DEEP}; }}
+    QPlainTextEdit {{ background: #F6F8FB; border: none; border-radius: {px(6)}px;
+                      font-family: "DejaVu Sans Mono", Menlo, Consolas, monospace; font-size: {px(12)}px;
+                      padding: {px(6)}px; }}
+    QToolBar {{ background: transparent; border: none; spacing: {px(2)}px; }}
+    QToolButton {{ background: transparent; border: none; border-radius: {px(4)}px; padding: {px(3)}px; }}
+    QToolButton:hover {{ background: {BLUE_PALE}; }}
+    QToolButton:checked {{ background: {BLUE_PALE_2}; }}
+    QSplitter::handle {{ background: transparent; }}
+
+    QDialog {{ background: {CARD}; }}
+    QComboBox, QFontComboBox {{ background: {CHIP}; border: none; border-radius: {px(5)}px;
+                                padding: {px(5)}px {px(8)}px; min-width: {px(260)}px; }}
+    QComboBox QAbstractItemView {{ background: {WHITE}; selection-background-color: {BLUE_PALE};
+                                   selection-color: {TEXT}; }}
+    QLabel#preview {{ background: {PINK_PALE}; padding: {px(9)}px {px(10)}px; border-radius: {px(6)}px; }}
+    '''
+
+
+# ======================================================================
+#                             SMALL WIDGETS
+# ======================================================================
+def button(text, slot, name='pink'):
+    b = QtWidgets.QPushButton(text)
+    b.setObjectName(name)
+    b.setCursor(Qt.PointingHandCursor)
+    b.clicked.connect(slot)
+    return b
+
+
+def label(text, name=None, tip=None):
+    lab = QtWidgets.QLabel(text)
+    if name:
+        lab.setObjectName(name)
+    if tip:
+        lab.setToolTip(tip)
+    return lab
+
+
+def set_error(widget, on):
+    widget.setProperty('error', 'true' if on else 'false')
+    widget.style().unpolish(widget)
+    widget.style().polish(widget)
+
+
+class Segmented(QtWidgets.QFrame):
+    '''A segmented control; calls on_change(value) when the user picks an option.'''
+
+    def __init__(self, options, value, on_change=None):
+        super().__init__()
+        self.setObjectName('segbox')
+        lay = QtWidgets.QHBoxLayout(self)
+        lay.setContentsMargins(px(2), px(2), px(2), px(2))
+        lay.setSpacing(px(2))
+        self.group = QtWidgets.QButtonGroup(self)
+        self.buttons = {}
+        for val, text in options:
+            b = QtWidgets.QPushButton(text)
+            b.setObjectName('seg')
+            b.setCheckable(True)
+            b.setCursor(Qt.PointingHandCursor)
+            b.setChecked(val == value)
+            b.clicked.connect(lambda _=False, v=val: on_change and on_change(v))
+            self.group.addButton(b)
+            self.buttons[val] = b
+            lay.addWidget(b)
+        self.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
+
+    def value(self):
+        for val, b in self.buttons.items():
+            if b.isChecked():
+                return val
+        return None
+
+
+class Toolbar(NavigationToolbar2QT):
+    # the standard matplotlib toolbar without the subplot and figure-options dialogs
+    toolitems = [t for t in NavigationToolbar2QT.toolitems if t[0] not in ('Subplots', 'Customize')]
+
+
+def hbox(*items, spacing=8, margins=(0, 0, 0, 0)):
+    w = QtWidgets.QWidget()
+    lay = QtWidgets.QHBoxLayout(w)
+    lay.setContentsMargins(*[px(m) for m in margins])
+    lay.setSpacing(px(spacing))
+    for it in items:
+        if it is None:
+            lay.addStretch(1)
+        elif isinstance(it, int):
+            lay.addSpacing(px(it))
+        else:
+            lay.addWidget(it)
+    return w
+
+
+class FlowLayout(QtWidgets.QLayout):
+    '''Lays widgets out left to right and wraps them onto new lines when space runs out.'''
+
+    def __init__(self, parent=None, hspacing=8, vspacing=8):
+        super().__init__(parent)
+        self.setContentsMargins(0, 0, 0, 0)
+        self._items, self._h, self._v = [], px(hspacing), px(vspacing)
+
+    def addItem(self, item):
+        self._items.append(item)
+
+    def count(self):
+        return len(self._items)
+
+    def itemAt(self, i):
+        return self._items[i] if 0 <= i < len(self._items) else None
+
+    def takeAt(self, i):
+        return self._items.pop(i) if 0 <= i < len(self._items) else None
+
+    def expandingDirections(self):
+        try:
+            return Qt.Orientations(0)
+        except (AttributeError, TypeError):
+            return Qt.Orientation(0)
+
+    def hasHeightForWidth(self):
+        return True
+
+    def heightForWidth(self, width):
+        return self._arrange(QtCore.QRect(0, 0, width, 0), apply=False)
+
+    def setGeometry(self, rect):
+        super().setGeometry(rect)
+        self._arrange(rect, apply=True)
+
+    def sizeHint(self):
+        return self.minimumSize()
+
+    def minimumSize(self):
+        size = QtCore.QSize()
+        for item in self._items:
+            if item.widget() is None or item.widget().isVisibleTo(self.parentWidget()):
+                size = size.expandedTo(item.minimumSize())
+        return size
+
+    def _arrange(self, rect, apply):
+        lines, line, x = [], [], rect.x()
+        for item in self._items:
+            w = item.widget()
+            if w is not None and not w.isVisibleTo(self.parentWidget()):
+                continue
+            hint = item.sizeHint()
+            if line and x + hint.width() > rect.right() + 1:
+                lines.append(line)
+                line, x = [], rect.x()
+            line.append((item, x, hint))
+            x += hint.width() + self._h
+        if line:
+            lines.append(line)
+        y = rect.y()
+        for line in lines:
+            height = max(h.height() for _, _, h in line)
+            if apply:   # centre every item vertically within its line
+                for item, x, hint in line:
+                    item.setGeometry(QtCore.QRect(QtCore.QPoint(x, y + (height - hint.height()) // 2), hint))
+            y += height + self._v
+        return max(0, y - self._v - rect.y())
+
+
+def flow(*widgets, hspacing=12, vspacing=8):
+    w = QtWidgets.QWidget()
+    lay = FlowLayout(w, hspacing, vspacing)
+    for it in widgets:
+        lay.addWidget(it)
+    return w
+
+
+# ======================================================================
+#                              APPLICATION
+# ======================================================================
+class CGWindow(QtWidgets.QMainWindow):
+    def __init__(self, app, scale=None):
+        super().__init__()
+        self.app = app
+        self.setWindowTitle('CG++')
+        self.prefs = load_prefs()
+        self.auto = auto_scale(app)
+        self.scale = scale or self.prefs.get('scale', self.auto)
+        self.font_choice = self.prefs.get('font', '')
+
+        # model state, kept across rebuilds of the interface
+        self.values = dict(DEFAULTS)
+        self.ymin, self.ymax = '1e-11', '1e-7'
+        self.flux_mode, self.yscale, self.struct = 'total', 'log', 'hr'
+        self.obs_style, self.show_obs, self.fit_all = 'line', True, False
+        self.a = self.sed = self.red = self.rtau = None
+        self.obs = self.obs_name = self.model_name = None
+        self.last_run = None
+        self.last_log, self.last_msgs = '', []
+        self.status = ('', 'idle')
+        self.busy = False
+        self.showing_log = False
+        self.results = queue.Queue()
+
+        self._shortcuts()
+        self.apply_scale(self.scale, first=True)
+        QtCore.QTimer.singleShot(150, self.run_model)
+
+    # ------------------------------------------------------------ scale & fonts
+    def family(self):
+        try:
+            families = QtGui.QFontDatabase.families()      # Qt 6: static
+        except TypeError:
+            families = QtGui.QFontDatabase().families()    # Qt 5
+        if self.font_choice and self.font_choice in families:
+            return self.font_choice
+        return self.app.font().family()
+
+    def apply_scale(self, scale, first=False):
+        UI['scale'] = self.scale = scale
+        fam = self.family()
+        self.app.setStyleSheet(stylesheet(fam))
+        self._setup_matplotlib(fam)
+        screen = self.app.primaryScreen().availableGeometry()
+        w, h = min(px(1440), int(screen.width() * 0.94)), min(px(880), int(screen.height() * 0.9))
+        if first:
+            self.resize(w, h)
+            self.move(screen.x() + (screen.width() - w) // 2, screen.y() + (screen.height() - h) // 3)
+        elif not self.isMaximized():
+            self.resize(w, h)
+        self.build()
+
+    def _setup_matplotlib(self, family):
+        s = self.scale
+        mpl_names = {f.name for f in font_manager.fontManager.ttflist}
+        matplotlib.rcParams.update({
+            'font.family': 'sans-serif',
+            'font.sans-serif': [family if family in mpl_names else 'DejaVu Sans', 'DejaVu Sans'],
+            'font.size': 9 * s, 'axes.labelsize': 10 * s, 'xtick.labelsize': 9 * s, 'ytick.labelsize': 9 * s,
+            'legend.fontsize': 9 * s, 'lines.linewidth': 1.6 * s, 'lines.markersize': 6 * s,
+            'axes.linewidth': 0.8 * s, 'xtick.major.size': 3.5 * s, 'ytick.major.size': 3.5 * s,
+            'xtick.minor.size': 2 * s, 'ytick.minor.size': 2 * s, 'xtick.major.width': 0.8 * s,
+            'ytick.major.width': 0.8 * s, 'xtick.minor.width': 0.6 * s, 'ytick.minor.width': 0.6 * s,
+            'lines.markeredgewidth': 1.0 * s, 'errorbar.capsize': 0,
+            'axes.edgecolor': '#A3ABBA', 'axes.labelcolor': '#3B415E',
+            'xtick.color': '#5D6479', 'ytick.color': '#5D6479',
+            'xtick.direction': 'in', 'ytick.direction': 'in', 'xtick.top': True, 'ytick.right': True,
+            'legend.frameon': False, 'figure.facecolor': CARD, 'axes.facecolor': CARD,
+        })
+
+    def zoom(self, step):
+        i = min(range(len(SCALES)), key=lambda k: abs(SCALES[k] - self.scale))
+        i = max(0, min(len(SCALES) - 1, i + step))
+        if SCALES[i] != self.scale:
+            self.prefs['scale'] = SCALES[i]
+            save_prefs(self.prefs)
+            self.apply_scale(SCALES[i])
+            self.set_status(f'Interface size {format_scale(SCALES[i])}.', 'ok')
+
+    def _shortcuts(self):
+        def add(seq, slot):
+            QShortcut(QtGui.QKeySequence(seq), self).activated.connect(slot)
+        add('Ctrl+R', self.run_model)
+        add('Ctrl+Return', self.run_model)
+        add(QtGui.QKeySequence.Open, self.open_model)
+        add(QtGui.QKeySequence.Save, self.save_model)
+        add(QtGui.QKeySequence.Quit, self.close)
+        add(QtGui.QKeySequence.ZoomIn, lambda: self.zoom(+1))
+        add('Ctrl+=', lambda: self.zoom(+1))
+        add(QtGui.QKeySequence.ZoomOut, lambda: self.zoom(-1))
+
+    # ------------------------------------------------------------ building
+    def build(self):
+        old = self.centralWidget()
+        root = QtWidgets.QWidget()
+        root.setObjectName('main')
+        lay = QtWidgets.QHBoxLayout(root)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(0)
+        self.entries = {}
+        lay.addWidget(self._build_sidebar())
+        lay.addWidget(self._build_main(), 1)
+        self.setCentralWidget(root)
+        if old is not None:
+            old.deleteLater()
+        self._restore()
+
+    def _build_sidebar(self):
+        side = QtWidgets.QWidget()
+        side.setObjectName('sidebar')
+        side.setFixedWidth(px(310))
+        outer = QtWidgets.QVBoxLayout(side)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+
+        head = QtWidgets.QWidget()
+        hl = QtWidgets.QVBoxLayout(head)
+        hl.setContentsMargins(px(22), px(18), px(22), px(10))
+        hl.setSpacing(px(2))
+        hl.addWidget(label('CG++', 'brand'))
+        hl.addWidget(label('Passive flared disk model', 'tagline'))
+        hl.addSpacing(px(12))
+        for colour in (BLUE, PINK, WHITE, PINK, BLUE):   # a thin flag band under the name
+            stripe = QtWidgets.QFrame()
+            stripe.setFixedHeight(px(3))
+            stripe.setStyleSheet(f'background: {colour}; border: none;')
+            hl.addWidget(stripe)
+        hl.setSpacing(0)
+        outer.addWidget(head)
+
+        scroll = QtWidgets.QScrollArea()
+        scroll.setObjectName('sideScroll')
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setFrameShape(QtWidgets.QFrame.NoFrame)
+        body = QtWidgets.QWidget()
+        body.setObjectName('sidebarBody')
+        grid = QtWidgets.QGridLayout(body)
+        grid.setContentsMargins(px(22), px(4), px(14), px(12))
+        grid.setHorizontalSpacing(px(6))
+        grid.setVerticalSpacing(px(4))
+        grid.setColumnStretch(0, 1)
+        row = 0
+        for title, fields in SECTIONS:
+            grid.addWidget(label(title, 'section'), row, 0, 1, 3)
+            row += 1
+            for key, text, unit, _, tip in fields:
+                if key in DUST_KEYS:
+                    tip = DUST_TIP
+                cell = [label(text)]
+                if tip:
+                    badge = label('i', 'badge', tip)
+                    badge.setAlignment(Qt.AlignCenter)
+                    badge.setCursor(Qt.WhatsThisCursor)
+                    cell.append(badge)
+                cell.append(None)
+                grid.addWidget(hbox(*cell, spacing=6), row, 0)
+                ent = QtWidgets.QLineEdit(self.values[key])
+                ent.setObjectName('param')
+                ent.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                ent.setFixedWidth(px(92))
+                ent.textChanged.connect(lambda txt, k=key: self._on_edit(k, txt))
+                ent.returnPressed.connect(self.run_model)
+                grid.addWidget(ent, row, 1)
+                u = label(unit, 'unit')
+                u.setFixedWidth(px(34))
+                grid.addWidget(u, row, 2)
+                self.entries[key] = ent
+                row += 1
+        grid.setRowStretch(row, 1)
+        scroll.setWidget(body)
+        outer.addWidget(scroll, 1)
+
+        foot = QtWidgets.QWidget()
+        fl = QtWidgets.QGridLayout(foot)
+        fl.setContentsMargins(px(22), px(14), px(22), px(16))
+        fl.setHorizontalSpacing(px(8))
+        fl.setVerticalSpacing(px(8))
+        rule = QtWidgets.QFrame()
+        rule.setObjectName('rule')
+        fl.addWidget(rule, 0, 0, 1, 2)
+        self.run_btn = button('Run model', self.run_model, 'primary')
+        fl.addWidget(self.run_btn, 1, 0, 1, 2)
+        fl.addWidget(button('Open model...', self.open_model, 'dark'), 2, 0)
+        fl.addWidget(button('Save model...', self.save_model, 'dark'), 2, 1)
+        hint = label('Press Enter in any field to run', 'hint')
+        hint.setAlignment(Qt.AlignCenter)
+        fl.addWidget(hint, 3, 0, 1, 2)
+        outer.addWidget(foot)
+        return side
+
+    def _card(self, title, *right):
+        card = QtWidgets.QFrame()
+        card.setObjectName('card')
+        lay = QtWidgets.QVBoxLayout(card)
+        lay.setContentsMargins(px(16), px(12), px(16), px(10))
+        lay.setSpacing(px(8))
+        lay.addWidget(hbox(label(title, 'title'), None, *right))
+        return card, lay
+
+    def _plot(self, lay):
+        fig = Figure(dpi=100)
+        try:
+            fig.set_layout_engine('constrained')
+        except AttributeError:   # matplotlib older than 3.6
+            fig.set_tight_layout(True)
+        ax = fig.add_subplot(111)
+        canvas = FigureCanvasQTAgg(fig)
+        canvas.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+        canvas.setMinimumHeight(px(160))
+        toolbar = Toolbar(canvas, None, coordinates=False)
+        toolbar.setIconSize(QtCore.QSize(px(20), px(20)))
+        toolbar.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
+        coords = label('', 'key')
+        coords.setFixedWidth(px(170))
+
+        def show_coords(event):
+            if event.inaxes is ax and event.xdata is not None and event.ydata is not None:
+                coords.setText(f'x {event.xdata:.4g}   y {event.ydata:.4g}')
+            else:
+                coords.setText('')
+        canvas.mpl_connect('motion_notify_event', show_coords)
+        lay.addWidget(canvas, 1)
+        return fig, ax, canvas, hbox(toolbar, coords, spacing=10)
+
+    def _build_main(self):
+        main = QtWidgets.QWidget()
+        main.setObjectName('main')
+        ml = QtWidgets.QVBoxLayout(main)
+        ml.setContentsMargins(px(18), px(14), px(18), px(16))
+        ml.setSpacing(px(12))
+
+        # top bar
+        self.name_lbl = label('Untitled model', 'title')
+        self.dot = QtWidgets.QLabel()
+        self.dot.setFixedSize(px(9), px(9))
+        self.status_lbl = label('', 'status')
+        ml.addWidget(hbox(self.name_lbl, 10, self.dot, self.status_lbl, None,
+                          button('Settings', self.show_settings, 'ghost'),
+                          button('Help', self.show_help, 'ghost'), spacing=6))
+
+        # ---- SED card
+        sed_card, sl = self._card('Spectral energy distribution', button('Save SED...', self.save_sed))
+        self.seg_flux = Segmented([('total', 'Total flux'), ('components', 'Components')], self.flux_mode,
+                                  lambda v: self._set('flux_mode', v))
+        self.seg_scale = Segmented([('log', 'Log'), ('linear', 'Linear')], self.yscale,
+                                   lambda v: self._set('yscale', v))
+
+        self.obs_lbl = label('No observations loaded', 'muted')
+        self.chk_obs = QtWidgets.QCheckBox('Show')
+        self.chk_obs.setChecked(self.show_obs)
+        self.chk_obs.toggled.connect(lambda v: self._set('show_obs', v))
+        self.seg_obs = Segmented([('line', 'Line'), ('symbol', 'Symbols')], self.obs_style,
+                                 lambda v: self._set('obs_style', v))
+        self.obs_remove = button('Remove', self.clear_obs, 'ghost')
+        self.obs_controls = [self.chk_obs, self.seg_obs, self.obs_remove]
+        sl.addWidget(flow(self.seg_flux, self.seg_scale))
+        sl.addWidget(flow(button('Load observations...', self.open_obs), self.obs_lbl,
+                          self.chk_obs, self.seg_obs, self.obs_remove))
+
+        self.fig_sed, self.ax_sed, self.cv_sed, tb = self._plot(sl)
+        self.ymin_ed, self.ymax_ed = QtWidgets.QLineEdit(self.ymin), QtWidgets.QLineEdit(self.ymax)
+        for ed in (self.ymin_ed, self.ymax_ed):
+            ed.setObjectName('yrange')
+            ed.setAlignment(Qt.AlignCenter)
+            ed.setFixedWidth(px(72))
+            ed.editingFinished.connect(self._range_edited)
+        self.chk_fit = QtWidgets.QCheckBox('Fit to model')
+        self.chk_fit.setChecked(self.fit_all)
+        self.chk_fit.toggled.connect(lambda v: self._set('fit_all', v))
+        yrange = hbox(label('y', 'muted'), self.ymin_ed, label('to', 'muted'), self.ymax_ed, 6,
+                      self.chk_fit, button('Reset', self.reset_range, 'ghost'), spacing=6)
+        sl.addWidget(flow(tb, yrange, hspacing=16))
+
+        # ---- structure card
+        st_card, stl = self._card('Disk structure')
+        self.seg_struct = Segmented([('hr', 'Height'), ('T', 'Temperature'), ('sigma', 'Density'),
+                                     ('tau', 'tau = 1'), ('opac', 'Opacity')], self.struct,
+                                    lambda v: self._set('struct', v))
+        stl.addWidget(hbox(self.seg_struct, None))
+        self.fig_st, self.ax_st, self.cv_st, tb2 = self._plot(stl)
+        stl.addWidget(tb2)
+
+        # ---- summary card
+        self.log_btn = button('Solver log', self.toggle_log, 'ghost')
+        sm_card, sml = self._card('Model summary', self.log_btn)
+        self.stack = QtWidgets.QStackedWidget()
+        self.sum_widget = QtWidgets.QWidget()
+        self.sum_grid = QtWidgets.QGridLayout(self.sum_widget)
+        self.sum_grid.setContentsMargins(0, 0, 0, 0)
+        self.sum_grid.setHorizontalSpacing(px(10))
+        self.sum_grid.setVerticalSpacing(px(3))
+        self.log_text = QtWidgets.QPlainTextEdit()
+        self.log_text.setReadOnly(True)
+        self.log_text.setLineWrapMode(QtWidgets.QPlainTextEdit.NoWrap)
+        self.stack.addWidget(self.sum_widget)
+        self.stack.addWidget(self.log_text)
+        sml.addWidget(self.stack, 1)
+
+        right = QtWidgets.QSplitter(Qt.Vertical)
+        right.setChildrenCollapsible(False)
+        right.setHandleWidth(px(14))
+        right.addWidget(st_card)
+        right.addWidget(sm_card)
+        right.setStretchFactor(0, 3)
+        right.setStretchFactor(1, 2)
+        right.setSizes([px(500), px(260)])
+
+        split = QtWidgets.QSplitter(Qt.Horizontal)
+        split.setChildrenCollapsible(False)
+        split.setHandleWidth(px(14))
+        split.addWidget(sed_card)
+        split.addWidget(right)
+        split.setStretchFactor(0, 11)
+        split.setStretchFactor(1, 9)
+        split.setSizes([px(640), px(520)])
+        ml.addWidget(split, 1)
+        return main
+
+    def _restore(self):
+        '''Put the model state back into a freshly built interface.'''
+        self.name_lbl.setText(self.model_name or 'Untitled model')
+        self.set_status(*self.status)
+        self.run_btn.setEnabled(not self.busy)
+        self.run_btn.setText('Computing...' if self.busy else 'Run model')
+        self._obs_ui()
+        self._write_log(self.last_log, self.last_msgs)
+        self._fill_summary(self.last_log)
+        self.stack.setCurrentIndex(1 if self.showing_log else 0)
+        self.log_btn.setText('Summary' if self.showing_log else 'Solver log')
+        if self.sed is None:
+            for ax, msg in ((self.ax_sed, 'Computing model...'), (self.ax_st, '')):
+                ax.set_axis_off()
+                ax.text(0.5, 0.5, msg, ha='center', va='center', color=TEXT_2, transform=ax.transAxes)
+        else:
+            self.redraw_sed()
+            self.redraw_structure()
+
+    def _set(self, attr, value):
+        setattr(self, attr, value)
+        if attr == 'struct':
+            self.redraw_structure()
+        else:
+            self.redraw_sed()
+
+    # ------------------------------------------------------------ status
+    def set_status(self, text, kind='idle'):
+        self.status = (text, kind)
+        color = {'idle': SIDE_MUTED, 'busy': BLUE, 'ok': OK, 'stale': STALE, 'error': ERROR}[kind]
+        self.dot.setStyleSheet(f'background: {color}; border-radius: {px(9) // 2}px;')
+        self.status_lbl.setText(text)
+        set_error(self.status_lbl, kind == 'error')
+
+    def _on_edit(self, key, text):
+        self.values[key] = text
+        ent = self.entries.get(key)
+        if ent is not None and ent.property('error') == 'true':
+            set_error(ent, False)
+        if self.last_run is not None and not self.busy:
+            self.set_status('Parameters changed. Run the model to update.', 'stale')
+
+    # ------------------------------------------------------------ inputs
+    def collect(self):
+        '''Read and validate every field. Returns a dict, or None after flagging errors.'''
+        values, bad = {}, []
+        for key, raw in self.values.items():
+            try:
+                num = float(raw.strip())
+                if not np.isfinite(num):
+                    raise ValueError
+                if key in INT_KEYS:
+                    if num != int(num) or num < 2:
+                        raise ValueError
+                    num = int(num)
+                values[key] = num
+            except ValueError:
+                bad.append(key)
+                set_error(self.entries[key], True)
+        if bad:
+            what = LABELS[bad[0]].lower()
+            hint = 'a whole number of at least 2' if bad[0] in INT_KEYS else 'a number'
+            more = f' ({len(bad) - 1} more field{"s" if len(bad) > 2 else ""} need fixing)' if len(bad) > 1 else ''
+            self.set_status(f'{what.capitalize()} must be {hint}{more}.', 'error')
+            self.entries[bad[0]].setFocus()
+            return None
+        if not any(values[k] > 0 for k in DUST_KEYS):
+            for k in DUST_KEYS:
+                set_error(self.entries[k], True)
+            self.set_status('Give at least one dust species an abundance above 0.', 'error')
+            return None
+        return values
+
+    # ------------------------------------------------------------ running
+    def run_model(self):
+        if self.busy:
+            return
+        params = self.collect()
+        if params is None:
+            return
+        self.busy = True
+        self.run_btn.setEnabled(False)
+        self.run_btn.setText('Computing...')
+        self.set_status('Computing model...', 'busy')
+        self.app.setOverrideCursor(Qt.WaitCursor)
+        threading.Thread(target=self._worker, args=(params,), daemon=True).start()
+        QtCore.QTimer.singleShot(80, self._poll)
+
+    def _worker(self, p):
+        buf = io.StringIO()
+        t0 = time.perf_counter()
+        try:
+            with warnings.catch_warnings(record=True) as caught, contextlib.redirect_stdout(buf):
+                warnings.simplefilter('always')
+                names = [k for k in DUST_KEYS if p[k] > 0]
+                opac = OpacityTable(dnames=names, abun=[p[k] for k in names])
+                a, sed = run_disk(p['nr'], p['incl'], p['tin'], p['ms'], p['ls'], p['ts'],
+                                  p['rout'], p['mdisk'], p['plsig'], opac, p['chi'])
+            msgs = [str(w.message) for w in caught]
+            self.results.put(('ok', a, sed, p, buf.getvalue(), msgs, time.perf_counter() - t0))
+        except Exception:
+            self.results.put(('error', traceback.format_exc(), buf.getvalue()))
+
+    def _poll(self):
+        try:
+            result = self.results.get_nowait()
+        except queue.Empty:
+            QtCore.QTimer.singleShot(80, self._poll)
+            return
+        self.busy = False
+        self.run_btn.setEnabled(True)
+        self.run_btn.setText('Run model')
+        self.app.restoreOverrideCursor()
+        if result[0] == 'error':
+            _, tb, log = result
+            self.last_log, self.last_msgs = log, [tb.strip()]
+            self._write_log(log, self.last_msgs)
+            self.set_status(f'The model failed: {tb.strip().splitlines()[-1]}', 'error')
+            if not self.showing_log:
+                self.toggle_log()
+            return
+        _, self.a, self.sed, params, log, msgs, dt = result
+        self.last_run = params
+        self.last_log, self.last_msgs = log, msgs
+        self.red = 1 / (4 * np.pi * (params['dist'] * pc) ** 2)
+        self.rtau = None
+        if sys.stdout:
+            sys.stdout.write(log)
+        self._write_log(log, msgs)
+        self._fill_summary(log)
+        self.redraw_sed()
+        self.redraw_structure()
+        note = f'  {len(msgs)} solver warning{"s" if len(msgs) != 1 else ""}, see the log.' if msgs else ''
+        self.set_status(f'Computed in {dt:.1f} s.{note}', 'stale' if msgs else 'ok')
+
+    # ------------------------------------------------------------ SED plot
+    def _range_edited(self):
+        self.ymin, self.ymax = self.ymin_ed.text(), self.ymax_ed.text()
+        self.redraw_sed()
+
+    def _ylimits(self):
+        try:
+            lo, hi = float(self.ymin), float(self.ymax)
+            if not lo < hi:
+                raise ValueError
+            ok = True
+        except ValueError:
+            ok = False
+        set_error(self.ymin_ed, not ok)
+        set_error(self.ymax_ed, not ok)
+        if not ok:
+            self.set_status('The y range needs two numbers, lower one first.', 'error')
+            return None
+        return lo, hi
+
+    def redraw_sed(self):
+        if self.sed is None:
+            return
+        sed, red = self.sed, self.red
+        wav = sed['wav'] * 1e4
+        total = sed['lnu'] * sed['nu'] * red
+        ax = self.ax_sed
+        ax.clear()
+        ax.set_axis_on()
+        components = self.flux_mode == 'components'
+        if components:
+            for key, lab, col in (('lnu_star', 'star', C_STAR), ('lnu_mid', 'midplane', C_MID),
+                                  ('lnu_wall', 'wall', C_WALL), ('lnu_surf', 'surface', C_SURF)):
+                ax.plot(wav, sed[key] * sed['nu'] * red, color=col, label=lab, lw=1.4 * self.scale)
+            ax.plot(wav, total, color=INK, label='total', lw=2 * self.scale)
+        else:
+            ax.plot(wav, total, color=INK, lw=2 * self.scale)
+
+        show_obs = self.obs is not None and self.show_obs
+        if show_obs:
+            self._plot_obs(ax)
+        if components or show_obs:
+            ax.legend(loc='best')
+
+        ax.set_xscale('log')
+        ax.set_yscale(self.yscale)
+        if self.fit_all:
+            ax.set_ylim(bottom=min(total), top=max(total))
+            ax.set_xlim(left=min(wav), right=max(wav))
+        else:
+            lim = self._ylimits()
+            if lim:
+                ax.set_ylim(bottom=lim[0], top=lim[1])
+            ax.set_xlim(left=0.1, right=1000)
+        ax.set_xlabel(WAV_XLABEL)
+        ax.set_ylabel(SED_YLABEL)
+        self.cv_sed.draw_idle()
+
+    def _plot_obs(self, ax):
+        nu, flux, flux_err, style = self.obs
+        wav = cc / nu * 1e4
+        kw = dict(color=C_OBS)
+        labelled = [False]
+
+        def lab():
+            if labelled[0]:
+                return None
+            labelled[0] = True
+            return self.obs_name
+
+        if self.obs_style == 'line':
+            m = style == 0
+            if m.any():
+                ax.plot(wav[m], flux[m] * nu[m], label=lab(), **kw)
+            m = (style != 0) & (flux_err > 0)
+            if m.any():
+                ax.errorbar(wav[m], flux[m] * nu[m], yerr=flux_err[m] * nu[m], label=lab(), **kw)
+            m = (style != 0) & (flux_err <= 0)
+            if m.any():
+                ax.scatter(wav[m], flux[m] * nu[m], marker='^', label=lab(), zorder=3,
+                           s=(5 * self.scale) ** 2, **kw)
+        else:
+            m = flux_err > 0
+            if m.any():
+                ax.errorbar(wav[m], flux[m] * nu[m], yerr=flux_err[m] * nu[m], label=lab(), **kw)
+            m = flux_err <= 0
+            if m.any():
+                ax.scatter(wav[m], flux[m] * nu[m], marker='^', label=lab(), zorder=3,
+                           s=(5 * self.scale) ** 2, **kw)
+
+    def reset_range(self):
+        self.ymin, self.ymax, self.fit_all = '1e-11', '1e-7', False
+        self.ymin_ed.setText(self.ymin)
+        self.ymax_ed.setText(self.ymax)
+        self.chk_fit.setChecked(False)
+        self.redraw_sed()
+
+    # ------------------------------------------------------------ structure plot
+    def redraw_structure(self):
+        if self.a is None:
+            return
+        a, sed, ax = self.a, self.sed, self.ax_st
+        kind = self.struct
+        ax.clear()
+        ax.set_axis_on()
+        r = a.r / AU
+        if kind == 'hr':
+            ax.plot(r, a.Hs / a.r, label='Hs', color=C_MID, linestyle='dashed')
+            ax.plot(r, a.Hp / a.r, label='Hp', color=INK)
+            ax.set_ylabel(r'$H/R$')
+            ax.legend()
+        elif kind == 'T':
+            ax.plot(r, a.Ti, label='Ti', color=INK)
+            ax.plot(r, a.Ts, label='Ts', color=C_WALL, linestyle='dashed')
+            ax.set_ylabel(r'$T$ (K)')
+            ax.legend()
+        elif kind == 'sigma':
+            ax.plot(r, a.Sigma, color=INK)
+            ax.set_ylabel(r'Dust surface density')
+        elif kind == 'tau':
+            if self.rtau is None:
+                self.rtau = findtauradii(a.opac, a.Sigma, a.r, a.Ti)
+            ax.plot(sed['wav'] * 1e4, self.rtau / AU, color=INK)
+            ax.set_xlim(left=0.1, right=10000)
+            ax.set_ylim(bottom=0.1, top=1000)
+            ax.set_ylabel(r'Radius for $\tau = 1$ (AU)')
+        elif kind == 'opac':
+            kappa = findkappa(a.opac, 0)
+            ax.plot(sed['wav'] * 1e4, kappa, color=INK)
+            ax.set_xlim(left=0.1, right=1000)
+            ax.set_ylabel(r'Opacity')
+        ax.set_xscale('log')
+        ax.set_yscale('log')
+        ax.set_xlabel(WAV_XLABEL if kind in ('tau', 'opac') else r'$R$ (AU)')
+        self.cv_st.draw_idle()
+
+    # ------------------------------------------------------------ summary & log
+    SUMMARY_NAMES = {
+        'Mass of the disk (dust)': 'Dust mass',
+        'Mass of the disk (dust+gas)': 'Gas+dust mass',
+        'Radius of the inner rim': 'Inner rim',
+        'Covering fraction by the wall': 'Rim covering',
+        'Inner wall Hs/Hp': 'Rim Hs/Hp',
+        'Covering fraction by CG disk': 'Disk covering',
+        'Disk optthin to own rad at R': 'Thin (own rad.)',
+        'Disk optthin to surf rad at R': 'Thin (surf. rad.)',
+        'Energy conservation error': 'Energy error',
+        'Full luminosity': 'Luminosity',
+        'L_wall/L_tot': 'L wall / L tot',
+        'L_mid/L_tot': 'L mid / L tot',
+        'L_surf/L_tot': 'L surf / L tot',
+        'L_scat/L_tot': 'L scat / L tot',
+        'L_accr/L_tot': 'L accr / L tot',
+    }
+
+    @classmethod
+    def summary_rows(cls, log):
+        rows = []
+        for line in log.splitlines():
+            shadow = re.match(r'\s*(Full|Half) shadow at ir=\d+, R=(\S+) AU', line)
+            if shadow:
+                rows.append((f'{shadow.group(1)} shadow at', f'{float(shadow.group(2)):.3g} AU'))
+                continue
+            if ' = ' not in line:
+                continue
+            key, val = line.split(' = ', 1)
+            key = ' '.join(key.split())
+            parts = val.split(' ', 1)
+            try:
+                number = float(parts[0])
+            except ValueError:
+                rows.append((cls.SUMMARY_NAMES.get(key, key), val))
+                continue
+            if key in ('L_scat/L_tot', 'L_accr/L_tot') and number == 0:
+                continue   # scattering and accretion are off; skip the zero rows
+            unit = parts[1].strip() if len(parts) > 1 else ''
+            unit = unit.replace('*4pi', 'x 4pi')
+            if key == 'Full luminosity':
+                unit = 'Lsun'
+            rows.append((cls.SUMMARY_NAMES.get(key, key), f'{number:.3g}' + (' ' + unit if unit else '')))
+        return rows
+
+    def _fill_summary(self, log):
+        while self.sum_grid.count():
+            item = self.sum_grid.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        rows = self.summary_rows(log)
+        half = (len(rows) + 1) // 2
+        for i, (k, v) in enumerate(rows):
+            col = 0 if i < half else 3
+            self.sum_grid.addWidget(label(k, 'key'), i % half, col)
+            val = label(v, 'value')
+            val.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            self.sum_grid.addWidget(val, i % half, col + 1)
+        if rows:
+            self.sum_grid.setColumnMinimumWidth(2, px(16))
+            self.sum_grid.setColumnStretch(0, 1)
+            self.sum_grid.setColumnStretch(3, 1)
+            self.sum_grid.setRowStretch(half, 1)
+
+    def _write_log(self, log, msgs):
+        self.log_text.clear()
+        self.log_text.appendPlainText(log.rstrip('\n'))
+        for m in msgs:
+            self.log_text.appendHtml(f'<span style="color:{ERROR}">'
+                                     + m.replace('&', '&amp;').replace('<', '&lt;').replace('\n', '<br>')
+                                     + '</span>')
+
+    def toggle_log(self):
+        self.showing_log = not self.showing_log
+        self.stack.setCurrentIndex(1 if self.showing_log else 0)
+        self.log_btn.setText('Summary' if self.showing_log else 'Solver log')
+
+    # ------------------------------------------------------------ files
+    @staticmethod
+    def _remember_folder(path):
+        global LAUNCH_DIR
+        LAUNCH_DIR = os.path.dirname(os.path.abspath(path))
+
+    @staticmethod
+    def _path(result):
+        return result[0] if isinstance(result, tuple) else result
+
+    def save_model(self):
+        start = os.path.join(LAUNCH_DIR, self.model_name or '')
+        path = self._path(QtWidgets.QFileDialog.getSaveFileName(self, 'Save model', start,
+                                                                'CG++ model (*.model);;All files (*)'))
+        if not path:
+            return
+        if not os.path.splitext(path)[1]:
+            path += '.model'
+        current = dict(self.values, ymin=self.ymin, ymax=self.ymax)
+        try:
+            with open(path, 'w') as file:
+                for key, prefix in MODEL_FILE_LINES:
+                    print(f'{prefix}{current[key]}', file=file)
+        except OSError as err:
+            self.set_status(f'Could not save the model: {err.strerror}.', 'error')
+            return
+        self._remember_folder(path)
+        self.model_name = os.path.basename(path)
+        self.name_lbl.setText(self.model_name)
+        self.set_status(f'Saved {self.model_name}.', 'ok')
+
+    def open_model(self):
+        path = self._path(QtWidgets.QFileDialog.getOpenFileName(self, 'Open model', LAUNCH_DIR,
+                                                                'CG++ model (*.model);;All files (*)'))
+        if not path:
+            return
+        out = {}
+        try:
+            with open(path, 'r') as file:
+                for line in file.readlines():
+                    if ':' not in line:
+                        continue
+                    key, value = [entry.strip() for entry in line.split(':', 1)]
+                    out[key] = value
+            new = {}
+            for key, lab in MODEL_FILE_LINES:
+                name = lab.split(':')[0]
+                if name not in out:
+                    continue
+                num = float(out[name])
+                if key == 'nr':
+                    new[key] = f'{int(num)}'
+                elif key in ('ymin', 'ymax'):
+                    new[key] = f'{num:.2e}'
+                else:
+                    new[key] = f'{num}'
+        except (OSError, ValueError) as err:
+            self.set_status(f'Could not read {os.path.basename(path)}: {err}', 'error')
+            return
+        for key, val in new.items():
+            if key == 'ymin':
+                self.ymin = val
+                self.ymin_ed.setText(val)
+            elif key == 'ymax':
+                self.ymax = val
+                self.ymax_ed.setText(val)
+            else:
+                self.entries[key].setText(val)
+        self._remember_folder(path)
+        self.model_name = os.path.basename(path)
+        self.name_lbl.setText(self.model_name)
+        self.run_model()
+
+    def open_obs(self):
+        path = self._path(QtWidgets.QFileDialog.getOpenFileName(self, 'Load observations', LAUNCH_DIR,
+                                                                'Observations (*.dat);;All files (*)'))
+        if not path:
+            return
+        try:
+            data = np.loadtxt(path, skiprows=3)
+            self.obs = (data[:, 0], data[:, 1], data[:, 2], data[:, 3])
+        except (OSError, ValueError, IndexError):
+            self.set_status(f'Could not read {os.path.basename(path)}: expected 4 columns '
+                            f'(nu, flux, error, style) after 3 header lines.', 'error')
+            return
+        self._remember_folder(path)
+        self.obs_name = os.path.basename(path)
+        self.show_obs = True
+        self.chk_obs.setChecked(True)
+        self._obs_ui()
+        self.redraw_sed()
+
+    def _obs_ui(self):
+        loaded = self.obs is not None
+        self.obs_lbl.setText(self.obs_name if loaded else 'No observations loaded')
+        self.obs_lbl.setObjectName('' if loaded else 'muted')
+        self.obs_lbl.style().unpolish(self.obs_lbl)
+        self.obs_lbl.style().polish(self.obs_lbl)
+        for w in self.obs_controls:
+            w.setVisible(loaded)
+
+    def clear_obs(self):
+        self.obs = self.obs_name = None
+        self._obs_ui()
+        self.redraw_sed()
+
+    def save_sed(self):
+        if self.sed is None:
+            self.set_status('Run the model before saving its SED.', 'error')
+            return
+        path = self._path(QtWidgets.QFileDialog.getSaveFileName(self, 'Save SED',
+                                                                os.path.join(LAUNCH_DIR, 'sed.out'),
+                                                                'All files (*)'))
+        if not path:
+            return
+        sed, red = self.sed, self.red
+        try:
+            with open(path, 'w') as file:
+                print('#wavelength     total          star          wall       midplane       surface', file=file)
+                for inu in range(len(sed['wav'])-1, -1, -1):
+                    print(f"{sed['wav'][inu]*1e4:.4e}   {sed['lnu'][inu]*sed['nu'][inu]*red:.5e}   {sed['lnu_star'][inu]*sed['nu'][inu]*red:.5e}   "
+                          f"{sed['lnu_wall'][inu]*sed['nu'][inu]*red:.5e}   {sed['lnu_mid'][inu]*sed['nu'][inu]*red:.5e}   {sed['lnu_surf'][inu]*sed['nu'][inu]*red:.5e}", file=file)
+        except OSError as err:
+            self.set_status(f'Could not save the SED: {err.strerror}.', 'error')
+            return
+        self.set_status(f'Saved SED to {os.path.basename(path)}.', 'ok')
+
+    # ------------------------------------------------------------ dialogs
+    def _dialog(self, title):
+        dlg = QtWidgets.QDialog(self)
+        dlg.setWindowTitle(title)
+        lay = QtWidgets.QVBoxLayout(dlg)
+        lay.setContentsMargins(px(26), px(22), px(26), px(20))
+        lay.setSpacing(px(4))
+        return dlg, lay
+
+    def show_settings(self):
+        dlg, lay = self._dialog('Settings')
+        lay.addWidget(label('Settings', 'title'))
+        lay.addSpacing(px(12))
+        lay.addWidget(label('<b>Interface size</b>'))
+        seg = Segmented([(s, format_scale(s)) for s in SCALES],
+                        min(SCALES, key=lambda s: abs(s - self.scale)))
+        lay.addWidget(seg)
+        lay.addWidget(label(f'Suggested for this screen: {format_scale(self.auto)}. '
+                            f'Ctrl + and Ctrl - also change it.', 'key'))
+        lay.addSpacing(px(14))
+        lay.addWidget(label('<b>Font</b>'))
+        combo = QtWidgets.QFontComboBox()
+        combo.setCurrentFont(QtGui.QFont(self.family()))
+        lay.addWidget(combo, 0, Qt.AlignLeft)
+        preview = label('Disk mass 0.05 Msun, T_in 1500 K, inclination 60 deg', 'preview')
+        lay.addSpacing(px(6))
+        lay.addWidget(preview)
+
+        def show_preview(font=None):
+            preview.setStyleSheet(f'font-family: "{combo.currentFont().family()}";')
+        combo.currentFontChanged.connect(show_preview)
+        show_preview()
+        lay.addWidget(label('Plots use the same font when matplotlib can find it.', 'key'))
+        reset = button('Use the system font', lambda: combo.setCurrentFont(QtGui.QFont(self.app.font().family())),
+                       'ghost')
+        lay.addSpacing(px(16))
+
+        def apply():
+            fam = combo.currentFont().family()
+            self.font_choice = '' if fam == self.app.font().family() else fam
+            new_scale = seg.value()
+            self.prefs.update(scale=new_scale, font=self.font_choice)
+            save_prefs(self.prefs)
+            dlg.accept()
+            self.apply_scale(new_scale)
+            self.set_status('Settings applied.', 'ok')
+        lay.addWidget(hbox(reset, None, button('Cancel', dlg.reject, 'ghost'), button('Apply', apply, 'apply'),
+                           spacing=6))
+        qexec(dlg)
+
+    def show_help(self):
+        dlg, lay = self._dialog('About CG++')
+        brand = label('CG++', 'title')
+        brand.setStyleSheet(f'font-size: {px(29)}px;')
+        lay.addWidget(brand)
+        lay.addWidget(label('A Python port of CG+ (Dullemond, Dominik & Natta 2001)', 'muted'))
+        lay.addSpacing(px(8))
+        notes = [
+            ('Parameters', 'Hover the small i next to a label for what it means. Rim Hs/Hp is computed by '
+                           'the model when set to 0 or below. Albedo has no effect, as scattering is turned off.'),
+            ('Running', 'Press Enter in any field, or Ctrl+R. The window stays responsive while the model '
+                        'computes; solver messages appear under Solver log.'),
+            ('Observations', 'Load a .dat file with 3 header lines and columns nu, flux, error, style. '
+                             'Use Show to toggle them, Remove to unload.'),
+            ('Files', 'Models are saved in the same .model format as before. Save SED writes the total and '
+                      'component fluxes as columns.'),
+            ('Layout', 'Drag the gaps between the panels to resize them.'),
+            ('Size and font', 'Change them under Settings, or use Ctrl + and Ctrl - for the size. '
+                              f'Your choice is remembered in {PREFS_PATH}.'),
+            ('License', 'Free software under the GNU General Public License, version 3 or later. '
+                        'You may share and modify it under the same terms; it comes with no warranty.'),
+            ('Contact', 'lis.zwicky@csfk.org'),
+        ]
+        for title, text in notes:
+            lay.addSpacing(px(6))
+            lay.addWidget(label(f'<b>{title}</b>'))
+            body = label(text, 'muted')
+            body.setWordWrap(True)
+            body.setFixedWidth(px(480))
+            lay.addWidget(body)
+        lay.addSpacing(px(14))
+        close = button('Close', dlg.accept, 'apply')
+        lay.addWidget(hbox(None, close))
+        close.setDefault(True)
+        qexec(dlg)
+
+
+def find_asset(name):
+    for base in (os.getcwd(), os.path.dirname(os.path.abspath(__file__))):
+        path = os.path.join(base, 'assets', name)
+        if os.path.isfile(path):
+            return path
+    return None
+
+
+def selftest():
+    '''Compute the default model without opening a window (used to check packaged builds).'''
+    p = {k: (int(v) if k in INT_KEYS else float(v)) for k, v in DEFAULTS.items()}
+    names = [k for k in DUST_KEYS if p[k] > 0]
+    opac = OpacityTable(dnames=names, abun=[p[k] for k in names])
+    a, sed = run_disk(p['nr'], p['incl'], p['tin'], p['ms'], p['ls'], p['ts'],
+                      p['rout'], p['mdisk'], p['plsig'], opac, p['chi'])
+    ok = bool(np.all(np.isfinite(sed['lnu'])) and sed['lnu'].max() > 0)
+    print('CG++ self-test', 'passed' if ok else 'FAILED')
+    return 0 if ok else 1
+
+
+def main():
+    if '--selftest' in sys.argv:
+        sys.exit(selftest())
+    scale = None
+    if '--scale' in sys.argv:
+        try:
+            scale = float(sys.argv[sys.argv.index('--scale') + 1])
+        except (IndexError, ValueError):
+            print('Usage: cgplusplus [--scale 1.5] [--selftest]')
+    if not QT6:
+        # Qt 5 needs these before the application exists to honour the OS display scaling
+        QtWidgets.QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
+        QtWidgets.QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
+    app = QtWidgets.QApplication(sys.argv)
+    app.setApplicationName('CG++')
+    icon = find_asset('cgplusplus.png')
+    if icon:
+        app.setWindowIcon(QtGui.QIcon(icon))
+    win = CGWindow(app, scale)
+    win.show()
+    sys.exit(qexec(app))
+
+
+if __name__ == '__main__':
+    main()

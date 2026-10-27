@@ -1,0 +1,84 @@
+# Builds the CG++ desktop app for Linux and Windows.
+# Runs on every pushed tag like v1.0 (and attaches the apps to that GitHub release),
+# or by hand from the Actions tab ("Run workflow"), where the apps appear as downloadable artifacts.
+name: Build executables
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04     # older Ubuntu = the app runs on more Linux systems
+            asset: cgplusplus-linux-x86_64.tar.gz
+          - os: windows-2022
+            asset: cgplusplus-windows-x86_64.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.10'
+          cache: pip
+          cache-dependency-path: requirements-build.txt
+
+      - name: Install build dependencies
+        run: pip install -r requirements-build.txt
+
+      - name: Qt's X11 cursor library (bundled into the Linux app; missing on some desktops)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libxcb-cursor0
+
+      - name: Build
+        run: pyinstaller --noconfirm --clean cgplusplus.spec
+
+      - name: Self-test (Linux)
+        if: runner.os == 'Linux'
+        working-directory: ${{ runner.temp }}
+        run: ${{ github.workspace }}/dist/cgplusplus --selftest
+
+      - name: Self-test (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        working-directory: ${{ runner.temp }}
+        run: |
+          $p = Start-Process -FilePath "${{ github.workspace }}\dist\cgplusplus.exe" -ArgumentList '--selftest' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "self-test failed with exit code $($p.ExitCode)" }
+
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        run: tar -czf ${{ matrix.asset }} -C dist cgplusplus -C .. LICENSE README.md
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Copy-Item dist\cgplusplus.exe ${{ matrix.asset }}
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.asset }}
+          path: ${{ matrix.asset }}
+          if-no-files-found: error
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: release
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v3
+        with:
+          files: release/*
