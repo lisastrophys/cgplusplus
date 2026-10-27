@@ -34,9 +34,12 @@ jobs:
       - name: Install build dependencies
         run: pip install -r requirements-build.txt
 
-      - name: Qt's X11 cursor library (bundled into the Linux app; missing on some desktops)
+      # libxcb-cursor0 gets bundled into the app (some desktops lack it). libegl1 and libgl1 belong to the
+      # graphics driver, so they are never bundled: every Linux desktop has them, but this server
+      # does not, and the self-test below needs them to load Qt the way a real desktop would.
+      - name: System libraries for Qt (Linux)
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libxcb-cursor0
+        run: sudo apt-get update && sudo apt-get install -y libxcb-cursor0 libegl1 libgl1
 
       - name: Build
         run: pyinstaller --noconfirm --clean cgplusplus.spec

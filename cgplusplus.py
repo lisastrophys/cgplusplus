@@ -1603,36 +1603,7 @@ import queue
 import threading
 import contextlib
 import traceback
-
-QT6 = False
-try:
-    from PySide6 import QtCore, QtGui, QtWidgets
-    QT6 = True
-except ImportError:
-    try:
-        from PyQt5 import QtCore, QtGui, QtWidgets
-    except ImportError:
-        try:
-            from PySide2 import QtCore, QtGui, QtWidgets
-        except ImportError:
-            sys.exit('CG++ needs Qt for Python. Install it with:  pip install PyQt5   (or PySide6)')
-
-# imported after the binding, so matplotlib picks the same one
-try:
-    from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg, NavigationToolbar2QT
-except ImportError:   # matplotlib older than 3.5
-    from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
-from matplotlib.figure import Figure
-from matplotlib import font_manager
-
-Qt = QtCore.Qt
-QShortcut = getattr(QtGui, 'QShortcut', None) or QtWidgets.QShortcut
-
-
-def qexec(obj):
-    '''exec() for every binding (PySide2 only has exec_).'''
-    return obj.exec() if hasattr(obj, 'exec') else obj.exec_()
-
+import importlib
 
 # ---------------------------------------------------------------- palette
 INK = '#1E2235'          # sidebar, primary text, total-flux curve
@@ -1851,6 +1822,99 @@ def stylesheet(family):
                                    selection-color: {TEXT}; }}
     QLabel#preview {{ background: {PINK_PALE}; padding: {px(9)}px {px(10)}px; border-radius: {px(6)}px; }}
     '''
+
+
+# ======================================================================
+#                     LOADING QT, AND THE SELF-TEST
+# ======================================================================
+# Libraries Qt takes from the operating system (they belong to the graphics driver, so packaged
+# apps do not bundle them), and the Ubuntu/Debian package that provides each.
+SYSTEM_LIBS = {'libEGL': 'libegl1', 'libGL': 'libgl1', 'libGLX': 'libglx0', 'libOpenGL': 'libopengl0',
+               'libxcb': 'libxcb1', 'libxcb-cursor': 'libxcb-cursor0', 'libxkbcommon': 'libxkbcommon0',
+               'libxkbcommon-x11': 'libxkbcommon-x11-0', 'libfontconfig': 'libfontconfig1', 'libdbus-1': 'libdbus-1-3'}
+
+
+def load_qt():
+    '''Import the first Qt binding that works: (QtCore, QtGui, QtWidgets, is_qt6).
+    If none does, raise ImportError with the real reason in plain words.'''
+    broken = []
+    for name in ('PySide6', 'PyQt5', 'PySide2'):
+        try:
+            importlib.import_module(name)
+        except ImportError:
+            continue   # this binding is not installed
+        try:
+            mods = [importlib.import_module(f'{name}.{m}') for m in ('QtCore', 'QtGui', 'QtWidgets')]
+            return mods[0], mods[1], mods[2], name == 'PySide6'
+        except ImportError as err:
+            broken.append((name, err))
+    if not broken:
+        raise ImportError('CG++ needs Qt for Python. Install it with:  pip install PyQt5   (or PySide6)')
+    name, err = broken[0]
+    msg = f'Qt ({name}) could not start: {err}'
+    lib = re.search(r'(lib[\w+-]+?)\.so', str(err))
+    if lib:
+        pkg = SYSTEM_LIBS.get(lib.group(1))
+        msg += (f'\n\nThis system is missing {lib.group(1)}.so, which Qt needs to draw windows. '
+                'Desktop Linux systems normally have it; minimal installs and servers may not.')
+        msg += f'\nOn Ubuntu or Debian install it with:  sudo apt install {pkg}' if pkg else \
+            '\nInstall it with your package manager.'
+    raise ImportError(msg)
+
+
+def selftest():
+    '''cgplusplus --selftest: compute the default model and check that Qt loads, without opening a window.
+    Used to check packaged builds; prints the results and returns the exit code.'''
+    model_ok = qt_ok = False
+    try:
+        p = {k: (int(v) if k in INT_KEYS else float(v)) for k, v in DEFAULTS.items()}
+        names = [k for k in DUST_KEYS if p[k] > 0]
+        opac = OpacityTable(dnames=names, abun=[p[k] for k in names])
+        a, sed = run_disk(p['nr'], p['incl'], p['tin'], p['ms'], p['ls'], p['ts'],
+                          p['rout'], p['mdisk'], p['plsig'], opac, p['chi'])
+        model_ok = bool(np.all(np.isfinite(sed['lnu'])) and sed['lnu'].max() > 0)
+        print('Model:', 'ok' if model_ok else 'FAILED (non-finite or empty SED)')
+    except Exception:
+        print('Model: FAILED')
+        traceback.print_exc()
+    try:
+        core, _, widgets, _ = load_qt()
+        app = widgets.QApplication(['cgplusplus', '-platform', 'offscreen'])   # also loads Qt's plugins
+        print('Qt:', core.qVersion(), 'ok')
+        qt_ok = True
+        del app
+    except ImportError as err:
+        print('Qt: FAILED')
+        print(err)
+    passed = model_ok and qt_ok
+    print('CG++ self-test', 'passed' if passed else 'FAILED')
+    return 0 if passed else 1
+
+
+if __name__ == '__main__' and '--selftest' in sys.argv:
+    sys.exit(selftest())
+
+try:
+    QtCore, QtGui, QtWidgets, QT6 = load_qt()
+except ImportError as _err:
+    sys.exit(str(_err))
+
+# imported after the binding, so matplotlib picks the same one
+try:
+    from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg, NavigationToolbar2QT
+except ImportError:   # matplotlib older than 3.5
+    from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
+from matplotlib.figure import Figure
+from matplotlib import font_manager
+
+Qt = QtCore.Qt
+QShortcut = getattr(QtGui, 'QShortcut', None) or QtWidgets.QShortcut
+
+
+def qexec(obj):
+    '''exec() for every binding (PySide2 only has exec_).'''
+    return obj.exec() if hasattr(obj, 'exec') else obj.exec_()
+
 
 
 # ======================================================================
@@ -2900,21 +2964,7 @@ def find_asset(name):
     return None
 
 
-def selftest():
-    '''Compute the default model without opening a window (used to check packaged builds).'''
-    p = {k: (int(v) if k in INT_KEYS else float(v)) for k, v in DEFAULTS.items()}
-    names = [k for k in DUST_KEYS if p[k] > 0]
-    opac = OpacityTable(dnames=names, abun=[p[k] for k in names])
-    a, sed = run_disk(p['nr'], p['incl'], p['tin'], p['ms'], p['ls'], p['ts'],
-                      p['rout'], p['mdisk'], p['plsig'], opac, p['chi'])
-    ok = bool(np.all(np.isfinite(sed['lnu'])) and sed['lnu'].max() > 0)
-    print('CG++ self-test', 'passed' if ok else 'FAILED')
-    return 0 if ok else 1
-
-
 def main():
-    if '--selftest' in sys.argv:
-        sys.exit(selftest())
     scale = None
     if '--scale' in sys.argv:
         try:
