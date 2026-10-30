@@ -5,9 +5,11 @@
 #   CG_ONEDIR=1 pyinstaller cgplusplus.spec  -> Linux/Windows: dist/cgplusplus/ folder: starts faster,
 #                                               fewer antivirus flags
 import os
+import platform
 import sys
 
 IS_MAC = sys.platform == 'darwin'
+MAC_MIN = '12.0' if platform.machine() == 'x86_64' else '14.0'   # set by the PySide6 and SciPy builds used
 ONEFILE = not os.environ.get('CG_ONEDIR') and not IS_MAC   # a macOS .app is always a folder inside
 
 datas = [('opac', 'opac'), ('assets/cgplusplus.png', 'assets')]
@@ -46,7 +48,7 @@ if IS_MAC:
         info_plist={
             'CFBundleDisplayName': 'CG++',
             'NSHighResolutionCapable': True,
-            'LSMinimumSystemVersion': '14.0',  # set by the PySide6 and SciPy builds used
+            'LSMinimumSystemVersion': MAC_MIN,
             'NSHumanReadableCopyright': 'Copyright (C) 2025 L. Zwicky. GNU GPL v3 or later.',
         },
     )

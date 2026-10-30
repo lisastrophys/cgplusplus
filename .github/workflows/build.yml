@@ -1,4 +1,4 @@
-# Builds the CG++ desktop app for Linux, Windows and macOS (Apple Silicon).
+# Builds the CG++ desktop app for Linux, Windows and macOS (Apple Silicon and Intel).
 # Runs on every pushed tag like v1.0 (and attaches the apps to that GitHub release),
 # or by hand from the Actions tab ("Run workflow"), where the apps appear as downloadable artifacts.
 name: Build executables
@@ -23,6 +23,8 @@ jobs:
             asset: cgplusplus-windows-x86_64.exe
           - os: macos-15         # Apple Silicon; the app needs macOS 14 or newer
             asset: cgplusplus-macos-arm64.zip
+          - os: macos-15-intel   # Intel; the app needs macOS 12 or newer
+            asset: cgplusplus-macos-intel.zip
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
@@ -32,6 +34,15 @@ jobs:
           python-version: '3.10'
           cache: pip
           cache-dependency-path: requirements-build.txt
+
+      # SciPy has two Intel Mac builds and pip would pick the one that needs macOS 14, so install the one
+      # that runs on older systems first. Together with PySide6 6.8 the Intel app runs on macOS 12+.
+      - name: SciPy for older macOS (Intel Mac)
+        if: runner.os == 'macOS' && runner.arch == 'X64'
+        run: |
+          pip download --no-deps --only-binary=:all: --platform macosx_12_0_x86_64 --python-version 3.10 \
+              --implementation cp "$(grep -i '^scipy==' requirements-build.txt)" -d older-wheels
+          pip install older-wheels/scipy-*.whl
 
       - name: Install build dependencies
         run: pip install -r requirements-build.txt
